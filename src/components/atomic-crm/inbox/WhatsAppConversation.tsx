@@ -19,16 +19,6 @@ const sendErrors: Record<string, string> = {
     "No se pudo confirmar el envío. Consulta su estado antes de intentarlo de nuevo.",
 };
 
-export const deliveryLabels: Record<string, string> = {
-  pending: "Pendiente de confirmación",
-  accepted: "Recibido por WhatsApp",
-  sent: "Enviado",
-  delivered: "Entregado",
-  read: "Leído",
-  failed: "Envío rechazado",
-  unknown: "Entrega sin confirmar",
-};
-
 type SendResult = { status: string };
 type SendAttempt = { requestId: string; text: string };
 

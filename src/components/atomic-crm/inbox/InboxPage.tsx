@@ -1,9 +1,5 @@
 import { useState } from "react";
-import {
-  deliveryLabels,
-  WhatsAppAttachment,
-  WhatsAppComposer,
-} from "./WhatsAppConversation";
+import { WhatsAppAttachment, WhatsAppComposer } from "./WhatsAppConversation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useGetIdentity, useNotify } from "ra-core";
 import { Link } from "react-router";
@@ -13,6 +9,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSupabaseClient } from "../providers/supabase/supabase";
 import { setContactArchived } from "../providers/supabase/setContactArchived";
 import { config } from "../root/config";
+
+const deliveryLabels: Record<string, string> = {
+  pending: "Pendiente de confirmación",
+  accepted: "Recibido por WhatsApp",
+  sent: "Enviado",
+  delivered: "Entregado",
+  read: "Leído",
+  failed: "Envío rechazado",
+  unknown: "Entrega sin confirmar",
+};
 
 const channels = {
   whatsapp: "WhatsApp",

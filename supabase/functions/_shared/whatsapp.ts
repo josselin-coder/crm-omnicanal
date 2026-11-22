@@ -153,11 +153,7 @@ export function extractEvents(
           ).slice(0, 4096),
           mediaId:
             mediaKind && phonePattern.test(mediaId) ? mediaId : undefined,
-          filename:
-            string(media.filename)
-              .replace(/[\\/\x00-\x1f\x7f]/g, "_")
-              .trim()
-              .slice(0, 160) || undefined,
+          filename: sanitizeFilename(string(media.filename)),
         });
       }
       for (const rawStatus of array(value.statuses)) {
@@ -183,6 +179,17 @@ export function extractEvents(
   }
 
   return { messages, deliveries };
+}
+
+function sanitizeFilename(value: string) {
+  const safe = Array.from(value, (character) => {
+    const code = character.charCodeAt(0);
+    if (character === "/" || character === "\\" || code < 32 || code === 127) {
+      return "_";
+    }
+    return character;
+  }).join("");
+  return safe.trim().slice(0, 160) || undefined;
 }
 
 export function isMetaMediaUrl(value: string): boolean {
