@@ -1,5 +1,9 @@
 import { useState } from "react";
 import { WhatsAppAttachment, WhatsAppComposer } from "./WhatsAppConversation";
+import {
+  AssistantObservation,
+  AssistantSimulator,
+} from "./CommercialAssistant";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useGetIdentity, useNotify } from "ra-core";
 import { Link } from "react-router";
@@ -71,6 +75,7 @@ function contactName({ customer }: Conversation) {
 }
 
 export function InboxPage() {
+  const [simulating, setSimulating] = useState(false);
   const { identity, isPending, error } = useGetIdentity();
 
   if (isPending) return <p role="status">Cargando bandeja…</p>;
@@ -80,7 +85,20 @@ export function InboxPage() {
   if (!config.supabaseUrl)
     return <p>La bandeja requiere una instancia de Supabase.</p>;
 
-  return <Inbox key={identity.id} sellerId={identity.id} />;
+  return (
+    <>
+      <div className="flex justify-end px-4 pt-3 md:px-0">
+        <Button variant="outline" onClick={() => setSimulating(!simulating)}>
+          {simulating ? "Volver a la bandeja" : "Abrir simulador"}
+        </Button>
+      </div>
+      {simulating ? (
+        <AssistantSimulator key={identity.id} />
+      ) : (
+        <Inbox key={identity.id} sellerId={identity.id} />
+      )}
+    </>
+  );
 }
 
 function Inbox({ sellerId }: { sellerId: string | number }) {
@@ -493,6 +511,13 @@ function ConversationDetail({
           </Button>
         </CardContent>
       </Card>
+      {conversation.whatsapp_phone_id && (
+        <AssistantObservation
+          conversationId={conversation.id}
+          canControl={Boolean(canReply)}
+          sellerId={sellerId}
+        />
+      )}
       <Card>
         <CardHeader>
           <CardTitle>Historial de mensajes</CardTitle>
