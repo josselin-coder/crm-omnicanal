@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(19);
+select plan(22);
 
 insert into public.user_invitations (user_id) values
     ('93000000-0000-4000-8000-000000000001'),
@@ -71,6 +71,24 @@ select is(has_table_privilege('authenticated', 'public.assistant_decisions', 'in
 set local request.jwt.claim.sub = '93000000-0000-4000-8000-000000000001';
 select is((select count(*) from assistant_decisions where reason = 'price_request'), 1::bigint,
     'The assigned seller can read the handoff audit record');
+
+reset role;
+reset request.jwt.claim.sub;
+insert into public.user_invitations (user_id) values ('93000000-0000-4000-8000-000000000003');
+insert into auth.users (id, email) values ('93000000-0000-4000-8000-000000000003', 'assistant-admin@example.invalid');
+update sales set administrator = true where email = 'assistant-admin@example.invalid';
+select receive_whatsapp_message('930','9312345680','Cliente sin asignación','wamid.assistant.unassigned',now(),
+    'Quiero comprar','text',null,null,null);
+create temporary table assistant_unassigned as select id from inbox_conversations where whatsapp_sender = '9312345680';
+select is(control_inbox_assistant('93000000-0000-4000-8000-000000000003',
+    (select id from assistant_unassigned),'enable'), 'observe', 'An administrator can observe an unassigned conversation');
+update assistant_claim set job = claim_assistant_observation((select id from assistant_unassigned));
+select is(finish_assistant_observation((select id from assistant_unassigned),
+    (select (job->>'token')::uuid from assistant_claim), (select (job->>'revision')::bigint from assistant_claim),
+    '{"action":"handoff","classification":"listo_para_ventas","reason":"purchase_intent","engine":"rules","facts":{}}'),
+    true, 'An unassigned conversation can be handed off');
+select is((select assigned_sales_id from inbox_conversations where id = (select id from assistant_unassigned)),
+    (select id from sales where email = 'assistant-other@example.invalid'), 'Handoff assigns the active seller with the lower workload');
 
 select * from finish();
 rollback;

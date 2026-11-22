@@ -229,7 +229,9 @@ export function decide(
       noDesignPattern.test(text) ||
       Boolean(
         lastQuestion?.includes("archivo") &&
-        /^(?:no|aun no|todavia no|no lo tengo|no tengo)[.!]?$/i.test(text.trim()),
+        /^(?:no|aun no|todavia no|no lo tengo|no tengo)[.!]?$/i.test(
+          text.trim(),
+        ),
       );
     lastQuestion = undefined;
   }

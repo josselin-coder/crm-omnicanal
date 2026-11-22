@@ -14,7 +14,7 @@ Tomar el control o reservar una respuesta manual en la bandeja detiene el análi
 
 ## Configuración del modelo y límites
 
-Define `OPENAI_API_KEY` y `OPENAI_ASSISTANT_MODEL` como secretos de Edge Functions en Supabase para usar un modelo compatible con Structured Outputs. Sin esa configuración, o si el proveedor falla, el servidor usa reglas y registra el motor utilizado. El modelo recibe texto del historial con accesos directos a teléfonos y correos redactados, y únicamente el tipo y la extensión de los adjuntos. El CRM no envía archivos al modelo.
+Define `OPENAI_API_KEY` y `OPENAI_ASSISTANT_MODEL` como secretos de Edge Functions en Supabase para usar un modelo compatible con Structured Outputs. Sin esa configuración, o si el proveedor falla, el servidor usa reglas y registra el motor utilizado. El servidor oculta los teléfonos y correos que reconoce antes de enviar el texto del historial al modelo. Para los adjuntos solo comparte su tipo y extensión. El CRM no envía archivos al modelo.
 
 Se analiza el historial completo hasta 200 mensajes y 50 000 caracteres. Los historiales mayores se derivan para revisión humana. Las decisiones guardan la clasificación, el motivo y los datos recopilados. El servidor aplica plantillas fijas para las sugerencias. El asistente carece de una operación para enviar mensajes, calcular precios, generar cotizaciones o cerrar ventas. El vendedor conserva el envío y el cierre.
 
