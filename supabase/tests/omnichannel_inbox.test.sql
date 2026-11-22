@@ -67,13 +67,14 @@ with reassigned as (update public.inbox_conversations set assigned_sales_id = nu
 select is((select count(*) from reassigned),
     0::bigint, 'A seller cannot reassign a conversation'
 );
-update public.inbox_customers set classification = 'interesado', archived_at = now() where contact_id = 9000001;
+update public.inbox_customers set classification = 'interesado' where contact_id = 9000001;
+select public.set_contact_archived(9000001, true);
 select is((select classification from public.inbox_customers where contact_id = 9000001), 'interesado',
     'An assigned seller can classify the customer');
-select ok((select archived_at is not null from public.inbox_customers where contact_id = 9000001),
+select ok((select archived_at is not null from public.contacts where id = 9000001),
     'An assigned seller can archive the customer');
-update public.inbox_customers set archived_at = null where contact_id = 9000001;
-select ok((select archived_at is null from public.inbox_customers where contact_id = 9000001),
+select public.set_contact_archived(9000001, false);
+select ok((select archived_at is null from public.contacts_summary where id = 9000001),
     'An assigned seller can restore the customer');
 select is((select body from public.inbox_messages
     where conversation_id = '90000000-0000-4000-8000-000000000005'), 'Mensaje conservado',

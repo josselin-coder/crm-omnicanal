@@ -24,6 +24,7 @@ import { config } from "../../root/config";
 import { getIsInitialized } from "./authProvider";
 import { searchDealCategories } from "./searchDealCategories";
 import { getSupabaseClient } from "./supabase";
+import { setContactArchived } from "./setContactArchived";
 
 const getBaseDataProvider = () =>
   supabaseDataProvider({
@@ -59,7 +60,16 @@ const getDataProviderWithCustomMethods = () => {
         return baseDataProvider.getList("companies_summary", params);
       }
       if (resource === "contacts") {
-        return baseDataProvider.getList("contacts_summary", params);
+        const { archiveView, ...filter } = params.filter ?? {};
+        return baseDataProvider.getList("contacts_summary", {
+          ...params,
+          filter: {
+            ...filter,
+            [archiveView === "archived"
+              ? "archived_at@not.is"
+              : "archived_at@is"]: null,
+          },
+        });
       }
       if (resource === "activity_log") {
         const { data, total } = await baseDataProvider.getList(
@@ -90,6 +100,44 @@ const getDataProviderWithCustomMethods = () => {
       }
 
       return baseDataProvider.getOne(resource, params);
+    },
+
+    async delete(resource: string, params: Parameters<DataProvider["delete"]>[1]) {
+      if (resource === "contacts") {
+        await setContactArchived(params.id, true);
+      } else if (resource === "contact_notes" || resource === "deal_notes") {
+        const { data, error } = await getSupabaseClient().rpc("archive_crm_note", {
+          target_id: params.id,
+          note_resource: resource,
+        });
+        if (error || !data) throw new HttpError("Cannot archive note", 403, error);
+      } else if (resource === "deals") {
+        return baseDataProvider.update(resource, {
+          ...params,
+          data: { archived_at: new Date().toISOString() },
+          previousData: params.previousData ?? { id: params.id },
+        });
+      } else {
+        return baseDataProvider.delete(resource, params);
+      }
+
+      return { data: params.previousData ?? { id: params.id } };
+    },
+    async deleteMany(resource: string, params: Parameters<DataProvider["deleteMany"]>[1]) {
+      if (resource === "contacts") {
+        const { error } = await getSupabaseClient().rpc("archive_contacts", {
+          target_ids: params.ids,
+        });
+        if (error) throw new HttpError("Cannot archive selected contacts", 403, error);
+        return { data: params.ids };
+      }
+      if (resource === "deals") {
+        return baseDataProvider.updateMany(resource, {
+          ...params,
+          data: { archived_at: new Date().toISOString() },
+        });
+      }
+      return baseDataProvider.deleteMany(resource, params);
     },
 
     async signUp({ email, password, first_name, last_name }: SignUpData) {

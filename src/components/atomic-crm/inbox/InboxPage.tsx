@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSupabaseClient } from "../providers/supabase/supabase";
+import { setContactArchived } from "../providers/supabase/setContactArchived";
+import { config } from "../root/config";
 
 const channels = {
   whatsapp: "WhatsApp",
@@ -38,8 +40,8 @@ type Conversation = {
   customer: {
     contact_id: number;
     classification: keyof typeof classifications;
-    archived_at: string | null;
     contact: {
+      archived_at: string | null;
       first_name: string | null;
       last_name: string | null;
       email_jsonb: { email: string }[] | null;
@@ -59,6 +61,8 @@ export function InboxPage() {
   if (isPending) return <p role="status">Cargando bandeja…</p>;
   if (error || !identity) return <p role="alert">No se pudo verificar tu sesión.</p>;
 
+  if (!config.supabaseUrl) return <p>La bandeja requiere una instancia de Supabase.</p>;
+
   return <Inbox key={identity.id} sellerId={identity.id} />;
 }
 
@@ -75,11 +79,11 @@ function Inbox({ sellerId }: { sellerId: string | number }) {
       let request = client
         .from("inbox_conversations")
         .select(
-          "id, channel, assigned_sales_id, last_message_at, customer:inbox_customers!inner(contact_id, classification, archived_at, contact:contacts!inner(first_name, last_name, email_jsonb, phone_jsonb))",
+          "id, channel, assigned_sales_id, last_message_at, customer:inbox_customers!inner(contact_id, classification, contact:contacts!inner(archived_at, first_name, last_name, email_jsonb, phone_jsonb))",
         );
       request = archived
-        ? request.not("customer.archived_at", "is", null)
-        : request.is("customer.archived_at", null);
+        ? request.not("customer.contact.archived_at", "is", null)
+        : request.is("customer.contact.archived_at", null);
       if (channel) request = request.eq("channel", channel);
       const { data, error } = await request
         .order("last_message_at", { ascending: false })
@@ -257,11 +261,15 @@ function ConversationDetail({ conversation, sellerId, onArchiveChange }: {
 
   type Change =
     | { classification: string }
-    | { archived_at: string | null }
+    | { archived: boolean }
     | { assigned_sales_id: number | null };
 
   const mutation = useMutation({
     mutationFn: async (change: Change) => {
+      if ("archived" in change) {
+        await setContactArchived(customer.contact_id, change.archived);
+        return;
+      }
       const request = "assigned_sales_id" in change
         ? client.from("inbox_conversations").update(change).eq("id", conversation.id).select("id").single()
         : client.from("inbox_customers").update(change).eq("contact_id", customer.contact_id).select("contact_id").single();
@@ -269,7 +277,10 @@ function ConversationDetail({ conversation, sellerId, onArchiveChange }: {
       if (error) throw error;
     },
     onSuccess: async (_, change) => {
-      if ("archived_at" in change) onArchiveChange();
+      if ("archived" in change) {
+        onArchiveChange();
+        await queryClient.invalidateQueries({ queryKey: ["contacts"] });
+      }
       await queryClient.invalidateQueries({ queryKey: ["inbox", sellerId, "conversations"] });
       notify("Cambio guardado", { type: "success" });
     },
@@ -283,7 +294,7 @@ function ConversationDetail({ conversation, sellerId, onArchiveChange }: {
           <CardTitle>{contactName(conversation)}</CardTitle>
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary">{channels[conversation.channel]}</Badge>
-            {customer.archived_at && <Badge variant="outline">Archivado</Badge>}
+            {customer.contact.archived_at && <Badge variant="outline">Archivado</Badge>}
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -340,10 +351,10 @@ function ConversationDetail({ conversation, sellerId, onArchiveChange }: {
             variant="outline"
             disabled={mutation.isPending}
             onClick={() => mutation.mutate({
-              archived_at: customer.archived_at ? null : new Date().toISOString(),
+              archived: !customer.contact.archived_at,
             })}
           >
-            {customer.archived_at ? "Restaurar cliente" : "Archivar cliente"}
+            {customer.contact.archived_at ? "Restaurar cliente" : "Archivar cliente"}
           </Button>
         </CardContent>
       </Card>

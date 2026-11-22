@@ -17,6 +17,8 @@ import { List } from "@/components/admin/list";
 import { SelectAllButton } from "@/components/admin/select-all-button";
 import { SortButton } from "@/components/admin/sort-button";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { config } from "../root/config";
 
 import type { Company, Contact, Sale, Tag } from "../types";
 import { BulkTagButton } from "./BulkTagButton";
@@ -82,12 +84,13 @@ const ContactBulkActionButtons = () => (
     <SelectAllButton />
     <BulkTagButton />
     <BulkExportButton />
-    <BulkDeleteButton />
+    <BulkDeleteButton label={config.supabaseUrl ? "Archivar selección" : undefined} />
   </>
 );
 
 const ContactListActions = () => (
   <TopToolbar>
+    <ContactArchiveFilter />
     <SortButton fields={["first_name", "last_name", "last_seen"]} />
     <DataImportButton resource="contacts" />
     <ExportButton exporter={exporter} />
@@ -130,7 +133,7 @@ const ContactListLayoutMobile = () => {
 
   const hasFilters = filterValues && Object.keys(filterValues).length > 0;
 
-  if (!isPending && !data?.length && !hasFilters) return <ContactEmpty />;
+  const empty = !isPending && !data?.length && !hasFilters;
 
   return (
     <div>
@@ -144,6 +147,8 @@ const ContactListLayoutMobile = () => {
         </div>
       </MobileHeader>
       <MobileContent>
+        <ContactArchiveFilter />
+        {empty && <ContactEmpty />}
         <ContactListFilterSummary />
         <ContactListContentMobile />
         {!error && (
@@ -202,3 +207,26 @@ const exporter: Exporter<Contact> = async (records, fetchRelatedRecords) => {
     downloadCSV(csv, "contacts");
   });
 };
+
+function ContactArchiveFilter() {
+  const { filterValues, displayedFilters, setFilters, onUnselectItems } = useListContext();
+  const archived = filterValues.archiveView === "archived";
+
+  if (!config.supabaseUrl) return null;
+
+  return (
+    <Button
+      variant="outline"
+      aria-pressed={archived}
+      onClick={() => {
+        const next = { ...filterValues };
+        if (archived) delete next.archiveView;
+        else next.archiveView = "archived";
+        onUnselectItems();
+        setFilters(next, displayedFilters);
+      }}
+    >
+      {archived ? "Ver clientes activos" : "Ver clientes archivados"}
+    </Button>
+  );
+}
