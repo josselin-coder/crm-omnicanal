@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { deliveryLabels, WhatsAppAttachment, WhatsAppComposer } from "./WhatsAppConversation";
+import {
+  deliveryLabels,
+  WhatsAppAttachment,
+  WhatsAppComposer,
+} from "./WhatsAppConversation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useGetIdentity, useNotify } from "ra-core";
 import { Link } from "react-router";
@@ -290,11 +294,14 @@ function ConversationDetail({
   const actor = staff.find((seller) => String(seller.id) === String(sellerId));
   const canAssign = actor?.administrator && !actor.disabled;
   const canReply =
-    actor && !actor.disabled &&
+    actor &&
+    !actor.disabled &&
     (actor.administrator || actor.id === conversation.assigned_sales_id) &&
     !customer.contact.archived_at;
   const lastInbound = conversation.last_inbound_at;
-  const windowOpen = Boolean(lastInbound && Date.now() - Date.parse(lastInbound) < 86_400_000);
+  const windowOpen = Boolean(
+    lastInbound && Date.now() - Date.parse(lastInbound) < 86_400_000,
+  );
   const assignee = staff.find(
     (seller) => seller.id === conversation.assigned_sales_id,
   );
@@ -370,7 +377,9 @@ function ConversationDetail({
           <CardTitle>{contactName(conversation)}</CardTitle>
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary">{channels[conversation.channel]}</Badge>
-            {!conversation.whatsapp_phone_id && <Badge variant="outline">Demostración</Badge>}
+            {!conversation.whatsapp_phone_id && (
+              <Badge variant="outline">Demostración</Badge>
+            )}
             {customer.contact.archived_at && (
               <Badge variant="outline">Archivado</Badge>
             )}
@@ -413,7 +422,11 @@ function ConversationDetail({
             </label>
             {canAssign ? (
               <label className="block space-y-1 text-sm">
-                <span>{conversation.assigned_sales_id ? "Transferir a vendedor" : "Asignar vendedor"}</span>
+                <span>
+                  {conversation.assigned_sales_id
+                    ? "Transferir a vendedor"
+                    : "Asignar vendedor"}
+                </span>
                 <select
                   className={selectClass}
                   value={conversation.assigned_sales_id ?? ""}
@@ -500,8 +513,17 @@ function ConversationDetail({
                 <p className="mt-1 whitespace-pre-wrap break-words">
                   {message.body}
                 </p>
-                {message.attachment_name && <WhatsAppAttachment messageId={message.id} name={message.attachment_name} />}
-                {message.send_status && <p className="text-xs text-muted-foreground">{deliveryLabels[message.send_status]}</p>}
+                {message.attachment_name && (
+                  <WhatsAppAttachment
+                    messageId={message.id}
+                    name={message.attachment_name}
+                  />
+                )}
+                {message.send_status && (
+                  <p className="text-xs text-muted-foreground">
+                    {deliveryLabels[message.send_status]}
+                  </p>
+                )}
               </li>
             ))}
           </ol>
@@ -510,9 +532,15 @@ function ConversationDetail({
             hasNext={history.data?.hasNext}
             onChange={setPage}
           />
-          {conversation.whatsapp_phone_id && canReply &&
-            (windowOpen ? <WhatsAppComposer conversationId={conversation.id} /> : (
-              <p className="text-sm text-muted-foreground">La ventana de 24 horas está cerrada. El cliente debe enviar un nuevo mensaje para habilitar respuestas de texto.</p>
+          {conversation.whatsapp_phone_id &&
+            canReply &&
+            (windowOpen ? (
+              <WhatsAppComposer conversationId={conversation.id} />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                La ventana de 24 horas está cerrada. El cliente debe enviar un
+                nuevo mensaje para habilitar respuestas de texto.
+              </p>
             ))}
         </CardContent>
       </Card>

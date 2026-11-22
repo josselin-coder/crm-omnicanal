@@ -73,13 +73,19 @@ async function saveMedia(
     "audio/ogg": ".ogg",
   };
   const extension = extensions[safeMime] ?? "";
-  const { error } = await supabaseAdmin.storage.from(bucket).upload(path, bytes, {
-    contentType: safeMime,
-    upsert: true,
-  });
+  const { error } = await supabaseAdmin.storage
+    .from(bucket)
+    .upload(path, bytes, {
+      contentType: safeMime,
+      upsert: true,
+    });
   if (error) throw new Error("Private media upload failed");
 
-  return { path, name: message.filename ?? `whatsapp-${objectId.slice(0, 8)}${extension}`, mime: safeMime };
+  return {
+    path,
+    name: message.filename ?? `whatsapp-${objectId.slice(0, 8)}${extension}`,
+    mime: safeMime,
+  };
 }
 
 async function receive(req: Request) {
@@ -94,10 +100,17 @@ async function receive(req: Request) {
   try {
     bytes = await readLimited(req.body, requestLimit);
   } catch (error) {
-    if (error instanceof BodyTooLarge) return new Response(null, { status: 413 });
+    if (error instanceof BodyTooLarge)
+      return new Response(null, { status: 413 });
     throw error;
   }
-  if (!await verifySignature(bytes, req.headers.get("x-hub-signature-256"), appSecret)) {
+  if (
+    !(await verifySignature(
+      bytes,
+      req.headers.get("x-hub-signature-256"),
+      appSecret,
+    ))
+  ) {
     return new Response(null, { status: 401 });
   }
   let payload: unknown;
@@ -107,7 +120,11 @@ async function receive(req: Request) {
     return new Response(null, { status: 400 });
   }
 
-  const { messages, deliveries } = extractEvents(payload, accountId, settings.phoneId);
+  const { messages, deliveries } = extractEvents(
+    payload,
+    accountId,
+    settings.phoneId,
+  );
   for (const message of messages) {
     const { data: existing, error: findError } = await supabaseAdmin
       .from("inbox_messages")
@@ -124,9 +141,10 @@ async function receive(req: Request) {
       sender_name: message.name,
       provider_id: message.id,
       received_at: message.timestamp,
-      message_body: !media && message.kind !== "text" && message.kind !== "unsupported"
-        ? `${message.body}\nAdjunto no disponible o superior a 20 MB.`
-        : message.body,
+      message_body:
+        !media && message.kind !== "text" && message.kind !== "unsupported"
+          ? `${message.body}\nAdjunto no disponible o superior a 20 MB.`
+          : message.body,
       kind: message.kind,
       media_path: media?.path ?? null,
       media_name: media?.name ?? null,
@@ -153,8 +171,10 @@ Deno.serve(async (req) => {
     const query = new URL(req.url).searchParams;
     const expected = Deno.env.get("WHATSAPP_WEBHOOK_VERIFY_TOKEN");
     const challenge = query.get("hub.challenge");
-    return expected && query.get("hub.mode") === "subscribe" &&
-      query.get("hub.verify_token") === expected && challenge
+    return expected &&
+      query.get("hub.mode") === "subscribe" &&
+      query.get("hub.verify_token") === expected &&
+      challenge
       ? new Response(challenge, { headers: { "Content-Type": "text/plain" } })
       : new Response(null, { status: 403 });
   }
