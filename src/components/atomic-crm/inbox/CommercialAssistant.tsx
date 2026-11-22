@@ -239,7 +239,9 @@ export function AssistantSimulator() {
   const [decision, setDecision] = useState<Decision>();
   const notify = useNotify();
   const mutation = useMutation({
-    mutationFn: (request: { transcript: Turn[] } | { previousDecisionId: string }) =>
+    mutationFn: (
+      request: { transcript: Turn[] } | { previousDecisionId: string },
+    ) =>
       invoke<{ decision: Decision; proposal: string | null }>({
         action: "simulate",
         ...request,

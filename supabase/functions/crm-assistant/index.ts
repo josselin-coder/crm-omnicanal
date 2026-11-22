@@ -1,7 +1,11 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders, OptionsMiddleware } from "../_shared/cors.ts";
 import { supabaseAdmin } from "../_shared/supabaseAdmin.ts";
-import { proposalFor, stopAssistant, type Decision } from "../_shared/assistant.ts";
+import {
+  proposalFor,
+  stopAssistant,
+  type Decision,
+} from "../_shared/assistant.ts";
 import {
   analyze,
   observeConversation,
@@ -69,9 +73,13 @@ Deno.serve((req) =>
     try {
       if (payload.action === "simulate") {
         let decision: Decision;
-        if (payload.previousDecisionId !== undefined || payload.stopped === true) {
+        if (
+          payload.previousDecisionId !== undefined ||
+          payload.stopped === true
+        ) {
           const previousId = string(payload.previousDecisionId);
-          if (!uuidPattern.test(previousId)) return respond({ error: "invalid_simulation" }, 400);
+          if (!uuidPattern.test(previousId))
+            return respond({ error: "invalid_simulation" }, 400);
 
           const { data: previous, error } = await client
             .from("assistant_decisions")
