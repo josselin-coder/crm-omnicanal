@@ -124,7 +124,10 @@ Deno.serve((req) =>
           .select("mode")
           .eq("conversation_id", target)
           .maybeSingle();
-        if (error || (visible?.mode !== "observe" && visible?.mode !== "handoff"))
+        if (
+          error ||
+          (visible?.mode !== "observe" && visible?.mode !== "handoff")
+        )
           return respond({ error: "forbidden" }, 403);
         await queueObservation(observeConversation(target));
         return respond({ ok: true });

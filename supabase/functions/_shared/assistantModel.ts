@@ -37,7 +37,12 @@ export function validateExtraction(value: unknown): Extraction | undefined {
     !intentValues.some((intent) => intent === x.intent) ||
     typeof x.humanRequested !== "boolean" ||
     typeof x.priceRequested !== "boolean" ||
-    !(x.decisionTurn === null || (typeof x.decisionTurn === "number" && Number.isInteger(x.decisionTurn) && x.decisionTurn >= 0))
+    !(
+      x.decisionTurn === null ||
+      (typeof x.decisionTurn === "number" &&
+        Number.isInteger(x.decisionTurn) &&
+        x.decisionTurn >= 0)
+    )
   )
     return undefined;
   return x as Extraction;

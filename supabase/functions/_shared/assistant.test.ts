@@ -119,7 +119,10 @@ describe("Commercial assistant", () => {
   it("accepts a spontaneous image and asks only for the missing quantity", () => {
     const transcript: Turn[] = [
       customer("Soy Luz. Necesito grabar madera."),
-      { ...customer("Esta es mi referencia"), attachment: { name: "referencia.jpg", kind: "image" } },
+      {
+        ...customer("Esta es mi referencia"),
+        attachment: { name: "referencia.jpg", kind: "image" },
+      },
     ];
     expect(decide(transcript, when).action).toBe("ask_quantity");
     transcript.push(suggested("¿Cuántas unidades necesitas?"), customer("20"));
@@ -134,10 +137,16 @@ describe("Commercial assistant", () => {
   });
 
   it("hands off a complete brief even when the customer did not give a name", () => {
-    const decision = decide([
-      customer("Necesito grabado de 12 placas."),
-      { ...customer("Adjunto el diseño"), attachment: { name: "placa.dxf", kind: "document" } },
-    ], when);
+    const decision = decide(
+      [
+        customer("Necesito grabado de 12 placas."),
+        {
+          ...customer("Adjunto el diseño"),
+          attachment: { name: "placa.dxf", kind: "document" },
+        },
+      ],
+      when,
+    );
     expect(decision.reason).toBe("brief_complete");
     expect(decision.classification).toBe("listo_para_ventas");
   });
@@ -152,8 +161,13 @@ describe("Commercial assistant", () => {
     const decision = decide(transcript, when, {
       afterHandoff: true,
       model: {
-        name: null, service: "grabado", quantity: 10, noDesign: false,
-        intent: "listo_para_ventas", humanRequested: true, priceRequested: false,
+        name: null,
+        service: "grabado",
+        quantity: 10,
+        noDesign: false,
+        intent: "listo_para_ventas",
+        humanRequested: true,
+        priceRequested: false,
         decisionTurn: 1,
       },
     });
@@ -161,7 +175,9 @@ describe("Commercial assistant", () => {
     expect(decision.reason).toBe("declined");
     expect(proposalFor(decision.action)).toBeNull();
     transcript.push(customer("Cambié de opinión. Quiero encargar el pedido."));
-    expect(decide(transcript, when, { afterHandoff: true }).classification).toBe("listo_para_ventas");
+    expect(
+      decide(transcript, when, { afterHandoff: true }).classification,
+    ).toBe("listo_para_ventas");
   });
 
   it("uses a newer model interpretation only when it points to a customer turn", () => {
@@ -171,12 +187,21 @@ describe("Commercial assistant", () => {
       suggested("Anotado."),
     ];
     const model = {
-      name: null, service: null, quantity: null, noDesign: false,
-      intent: "descartado" as const, humanRequested: false, priceRequested: false,
+      name: null,
+      service: null,
+      quantity: null,
+      noDesign: false,
+      intent: "descartado" as const,
+      humanRequested: false,
+      priceRequested: false,
       decisionTurn: 1,
     };
-    expect(decide(transcript, when, { model }).classification).toBe("descartado");
-    expect(decide(transcript, when, { model: { ...model, decisionTurn: 2 } }).reason).toBe("price_request");
+    expect(decide(transcript, when, { model }).classification).toBe(
+      "descartado",
+    );
+    expect(
+      decide(transcript, when, { model: { ...model, decisionTurn: 2 } }).reason,
+    ).toBe("price_request");
   });
 
   it("stops when a seller takes control, even for a price request", () => {

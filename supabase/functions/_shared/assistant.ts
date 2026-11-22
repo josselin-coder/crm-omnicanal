@@ -185,13 +185,19 @@ export function proposalFor(action: unknown): string | null {
     : null;
 }
 
-type Signal = "declined" | "undecided" | "human_request" | "price_request" | "purchase_intent";
+type Signal =
+  | "declined"
+  | "undecided"
+  | "human_request"
+  | "price_request"
+  | "purchase_intent";
 
 const declinePattern =
   /\b(?:ya no me interesa|no me interesa|cancela(?:r)? (?:mi solicitud|el pedido)|no (?:deseo|quiero|voy a) (?:continuar|seguir|comprar|encargar|contratar)|(?:ya )?no (?:lo|la) necesito|desisto|declino|mejor (?:ya )?no|deja(?:mos)?lo ahi)\b/;
 const undecidedPattern =
   /\b(?:no estoy segur[oa]|estoy evaluando|aun no decido|estoy comparando|lo voy a pensar)\b/;
-const resumePattern = /\b(?:sigamos|quiero continuar|retomemos|si me interesa)\b/;
+const resumePattern =
+  /\b(?:sigamos|quiero continuar|retomemos|si me interesa)\b/;
 
 function explicitSignal(text: string): Signal | undefined {
   for (const clause of text
@@ -207,11 +213,18 @@ function explicitSignal(text: string): Signal | undefined {
 }
 
 function latestSignal(turns: Turn[], model?: Extraction): Signal | undefined {
-  const modelSignal = model?.intent === "descartado" ? "declined"
-    : model?.intent === "indeciso" ? "undecided"
-    : model?.humanRequested ? "human_request"
-    : model?.priceRequested ? "price_request"
-    : model?.intent === "listo_para_ventas" ? "purchase_intent" : undefined;
+  const modelSignal =
+    model?.intent === "descartado"
+      ? "declined"
+      : model?.intent === "indeciso"
+        ? "undecided"
+        : model?.humanRequested
+          ? "human_request"
+          : model?.priceRequested
+            ? "price_request"
+            : model?.intent === "listo_para_ventas"
+              ? "purchase_intent"
+              : undefined;
   for (let index = turns.length - 1; index >= 0; index--) {
     const turn = turns[index];
     if (turn.role !== "customer") continue;
