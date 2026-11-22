@@ -86,6 +86,7 @@ export const generateContacts = (db: Db, size = 500): Required<Contact>[] => {
       background: lorem.sentence(),
       acquisition: random.arrayElement(["inbound", "outbound"]),
       avatar,
+      archived_at: null,
       first_seen: first_seen,
       last_seen: last_seen,
       has_newsletter: weightedBoolean(30),

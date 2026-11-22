@@ -3,8 +3,13 @@ import {
   HttpError,
   withLifecycleCallbacks,
   type DataProvider,
+  type DeleteManyParams,
+  type DeleteManyResult,
+  type DeleteParams,
+  type DeleteResult,
   type GetListParams,
   type Identifier,
+  type RaRecord,
   type ResourceCallbacks,
 } from "ra-core";
 import type {
@@ -102,28 +107,43 @@ const getDataProviderWithCustomMethods = () => {
       return baseDataProvider.getOne(resource, params);
     },
 
-    async delete(resource: string, params: Parameters<DataProvider["delete"]>[1]) {
+    async delete<RecordType extends RaRecord>(
+      resource: string,
+      params: DeleteParams<RecordType>,
+    ): Promise<DeleteResult<RecordType>> {
+      if (resource === "deals") {
+        const { data, error } = await getSupabaseClient()
+          .from("deals")
+          .update({ archived_at: new Date().toISOString() })
+          .eq("id", params.id)
+          .select()
+          .single()
+          .returns<RecordType>();
+        if (error) throw new HttpError("Cannot archive deal", 403, error);
+        return { data };
+      }
+      if (resource !== "contacts" && resource !== "contact_notes" && resource !== "deal_notes") {
+        return baseDataProvider.delete<RecordType>(resource, params);
+      }
+
+      const record = params.previousData ??
+        (await baseDataProvider.getOne<RecordType>(resource, { id: params.id, meta: params.meta })).data;
       if (resource === "contacts") {
         await setContactArchived(params.id, true);
-      } else if (resource === "contact_notes" || resource === "deal_notes") {
+      } else {
         const { data, error } = await getSupabaseClient().rpc("archive_crm_note", {
           target_id: params.id,
           note_resource: resource,
         });
         if (error || !data) throw new HttpError("Cannot archive note", 403, error);
-      } else if (resource === "deals") {
-        return baseDataProvider.update(resource, {
-          ...params,
-          data: { archived_at: new Date().toISOString() },
-          previousData: params.previousData ?? { id: params.id },
-        });
-      } else {
-        return baseDataProvider.delete(resource, params);
       }
 
-      return { data: params.previousData ?? { id: params.id } };
+      return { data: record };
     },
-    async deleteMany(resource: string, params: Parameters<DataProvider["deleteMany"]>[1]) {
+    async deleteMany<RecordType extends RaRecord>(
+      resource: string,
+      params: DeleteManyParams<RecordType>,
+    ): Promise<DeleteManyResult<RecordType>> {
       if (resource === "contacts") {
         const { error } = await getSupabaseClient().rpc("archive_contacts", {
           target_ids: params.ids,
@@ -132,12 +152,17 @@ const getDataProviderWithCustomMethods = () => {
         return { data: params.ids };
       }
       if (resource === "deals") {
-        return baseDataProvider.updateMany(resource, {
-          ...params,
-          data: { archived_at: new Date().toISOString() },
-        });
+        if (!params.ids.length) return { data: [] };
+        const { data, error } = await getSupabaseClient()
+          .from("deals")
+          .update({ archived_at: new Date().toISOString() })
+          .in("id", params.ids)
+          .select("id")
+          .returns<Pick<RecordType, "id">[]>();
+        if (error) throw new HttpError("Cannot archive selected deals", 403, error);
+        return { data: data.map(({ id }) => id) };
       }
-      return baseDataProvider.deleteMany(resource, params);
+      return baseDataProvider.deleteMany<RecordType>(resource, params);
     },
 
     async signUp({ email, password, first_name, last_name }: SignUpData) {
