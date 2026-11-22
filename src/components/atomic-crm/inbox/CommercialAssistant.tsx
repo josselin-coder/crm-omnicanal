@@ -239,17 +239,10 @@ export function AssistantSimulator() {
   const [decision, setDecision] = useState<Decision>();
   const notify = useNotify();
   const mutation = useMutation({
-    mutationFn: ({
-      transcript,
-      stopped,
-    }: {
-      transcript: Turn[];
-      stopped: boolean;
-    }) =>
+    mutationFn: (request: { transcript: Turn[] } | { previousDecisionId: string }) =>
       invoke<{ decision: Decision; proposal: string | null }>({
         action: "simulate",
-        transcript,
-        stopped,
+        ...request,
         afterHandoff: handedOff,
         useModel,
         time: simulationTime ? simulationTime + "-05:00" : undefined,
@@ -280,7 +273,6 @@ export function AssistantSimulator() {
     try {
       const response = await mutation.mutateAsync({
         transcript: next,
-        stopped: false,
       });
       setDecision(response.decision);
       if (response.decision.action === "handoff") setHandedOff(true);
@@ -298,10 +290,10 @@ export function AssistantSimulator() {
 
   async function takeControl() {
     setControlled(true);
+    if (!decision?.id) return;
     try {
       const response = await mutation.mutateAsync({
-        transcript: turns,
-        stopped: true,
+        previousDecisionId: decision.id,
       });
       setDecision(response.decision);
     } catch {

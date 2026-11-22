@@ -1,7 +1,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders, OptionsMiddleware } from "../_shared/cors.ts";
 import { supabaseAdmin } from "../_shared/supabaseAdmin.ts";
-import { proposalFor } from "../_shared/assistant.ts";
+import { proposalFor, stopAssistant, type Decision } from "../_shared/assistant.ts";
 import {
   analyze,
   observeConversation,
@@ -68,28 +68,50 @@ Deno.serve((req) =>
 
     try {
       if (payload.action === "simulate") {
-        const transcript = parseTranscript(payload.transcript);
-        const time = payload.time
-          ? Date.parse(string(payload.time))
-          : Date.now();
-        if (!transcript || !Number.isFinite(time))
-          return respond({ error: "invalid_simulation" }, 400);
-        const decision = await analyze(
-          transcript,
-          new Date(time),
-          payload.useModel === true,
-          payload.stopped === true,
-          payload.afterHandoff === true,
-        );
-        const { error } = await supabaseAdmin
+        let decision: Decision;
+        if (payload.previousDecisionId !== undefined || payload.stopped === true) {
+          const previousId = string(payload.previousDecisionId);
+          if (!uuidPattern.test(previousId)) return respond({ error: "invalid_simulation" }, 400);
+
+          const { data: previous, error } = await client
+            .from("assistant_decisions")
+            .select("classification, engine, facts")
+            .eq("id", previousId)
+            .eq("mode", "simulation")
+            .eq("actor_id", actor.id)
+            .maybeSingle();
+          if (error) throw new Error("Simulation decision could not be loaded");
+          if (!previous) return respond({ error: "simulation_not_found" }, 404);
+
+          decision = stopAssistant(previous);
+        } else {
+          const transcript = parseTranscript(payload.transcript);
+          const time = payload.time
+            ? Date.parse(string(payload.time))
+            : Date.now();
+          if (!transcript || !Number.isFinite(time))
+            return respond({ error: "invalid_simulation" }, 400);
+          decision = await analyze(
+            transcript,
+            new Date(time),
+            payload.useModel === true,
+            payload.afterHandoff === true,
+          );
+        }
+        const { data: saved, error } = await supabaseAdmin
           .from("assistant_decisions")
           .insert({
             ...decision,
             mode: "simulation",
             actor_id: actor.id,
-          });
+          })
+          .select("id")
+          .single();
         if (error) throw new Error("Simulation could not be recorded");
-        return respond({ decision, proposal: proposalFor(decision.action) });
+        return respond({
+          decision: { ...decision, id: saved.id },
+          proposal: proposalFor(decision.action),
+        });
       }
 
       const target = string(payload.conversationId);
