@@ -84,7 +84,9 @@ const ContactBulkActionButtons = () => (
     <SelectAllButton />
     <BulkTagButton />
     <BulkExportButton />
-    <BulkDeleteButton label={config.supabaseUrl ? "Archivar selección" : undefined} />
+    <BulkDeleteButton
+      label={config.supabaseUrl ? "Archivar selección" : undefined}
+    />
   </>
 );
 
@@ -181,7 +183,11 @@ const exporter: Exporter<Contact> = async (records, fetchRelatedRecords) => {
         contact.sales_id != null
           ? `${sales[contact.sales_id].first_name} ${sales[contact.sales_id].last_name}`
           : undefined,
-      tags: contact.tags?.map((tagId) => tags[tagId]?.name).filter(Boolean).join(", ") ?? "",
+      tags:
+        contact.tags
+          ?.map((tagId) => tags[tagId]?.name)
+          .filter(Boolean)
+          .join(", ") ?? "",
       email_work: contact.email_jsonb?.find((email) => email.type === "Work")
         ?.email,
       email_home: contact.email_jsonb?.find((email) => email.type === "Home")
@@ -209,7 +215,8 @@ const exporter: Exporter<Contact> = async (records, fetchRelatedRecords) => {
 };
 
 function ContactArchiveFilter() {
-  const { filterValues, displayedFilters, setFilters, onUnselectItems } = useListContext();
+  const { filterValues, displayedFilters, setFilters, onUnselectItems } =
+    useListContext();
   const archived = filterValues?.archiveView === "archived";
 
   if (!config.supabaseUrl) return null;

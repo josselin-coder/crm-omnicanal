@@ -117,25 +117,39 @@ const getDataProviderWithCustomMethods = () => {
           .update({ archived_at: new Date().toISOString() })
           .eq("id", params.id)
           .select()
-          .single()
-          .returns<RecordType>();
+          .returns<RecordType[]>()
+          .single();
         if (error) throw new HttpError("Cannot archive deal", 403, error);
         return { data };
       }
-      if (resource !== "contacts" && resource !== "contact_notes" && resource !== "deal_notes") {
+      if (
+        resource !== "contacts" &&
+        resource !== "contact_notes" &&
+        resource !== "deal_notes"
+      ) {
         return baseDataProvider.delete<RecordType>(resource, params);
       }
 
-      const record = params.previousData ??
-        (await baseDataProvider.getOne<RecordType>(resource, { id: params.id, meta: params.meta })).data;
+      const record =
+        params.previousData ??
+        (
+          await baseDataProvider.getOne<RecordType>(resource, {
+            id: params.id,
+            meta: params.meta,
+          })
+        ).data;
       if (resource === "contacts") {
         await setContactArchived(params.id, true);
       } else {
-        const { data, error } = await getSupabaseClient().rpc("archive_crm_note", {
-          target_id: params.id,
-          note_resource: resource,
-        });
-        if (error || !data) throw new HttpError("Cannot archive note", 403, error);
+        const { data, error } = await getSupabaseClient().rpc(
+          "archive_crm_note",
+          {
+            target_id: params.id,
+            note_resource: resource,
+          },
+        );
+        if (error || !data)
+          throw new HttpError("Cannot archive note", 403, error);
       }
 
       return { data: record };
@@ -148,7 +162,8 @@ const getDataProviderWithCustomMethods = () => {
         const { error } = await getSupabaseClient().rpc("archive_contacts", {
           target_ids: params.ids,
         });
-        if (error) throw new HttpError("Cannot archive selected contacts", 403, error);
+        if (error)
+          throw new HttpError("Cannot archive selected contacts", 403, error);
         return { data: params.ids };
       }
       if (resource === "deals") {
@@ -159,7 +174,8 @@ const getDataProviderWithCustomMethods = () => {
           .in("id", params.ids)
           .select("id")
           .returns<Pick<RecordType, "id">[]>();
-        if (error) throw new HttpError("Cannot archive selected deals", 403, error);
+        if (error)
+          throw new HttpError("Cannot archive selected deals", 403, error);
         return { data: data.map(({ id }) => id) };
       }
       return baseDataProvider.deleteMany<RecordType>(resource, params);

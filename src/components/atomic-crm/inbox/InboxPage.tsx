@@ -52,16 +52,20 @@ type Conversation = {
 
 function contactName({ customer }: Conversation) {
   const { first_name, last_name } = customer.contact;
-  return [first_name, last_name].filter(Boolean).join(" ") || "Cliente sin nombre";
+  return (
+    [first_name, last_name].filter(Boolean).join(" ") || "Cliente sin nombre"
+  );
 }
 
 export function InboxPage() {
   const { identity, isPending, error } = useGetIdentity();
 
   if (isPending) return <p role="status">Cargando bandeja…</p>;
-  if (error || !identity) return <p role="alert">No se pudo verificar tu sesión.</p>;
+  if (error || !identity)
+    return <p role="alert">No se pudo verificar tu sesión.</p>;
 
-  if (!config.supabaseUrl) return <p>La bandeja requiere una instancia de Supabase.</p>;
+  if (!config.supabaseUrl)
+    return <p>La bandeja requiere una instancia de Supabase.</p>;
 
   return <Inbox key={identity.id} sellerId={identity.id} />;
 }
@@ -91,7 +95,10 @@ function Inbox({ sellerId }: { sellerId: string | number }) {
         .range(page * pageSize, (page + 1) * pageSize)
         .returns<Conversation[]>();
       if (error) throw error;
-      return { items: data.slice(0, pageSize), hasNext: data.length > pageSize };
+      return {
+        items: data.slice(0, pageSize),
+        hasNext: data.length > pageSize,
+      };
     },
   });
   const items = query.data?.items ?? [];
@@ -107,7 +114,9 @@ function Inbox({ sellerId }: { sellerId: string | number }) {
       </div>
       <div className="grid items-start gap-4 md:grid-cols-[minmax(15rem,1fr)_minmax(0,2fr)]">
         <Card>
-          <CardHeader><CardTitle>Conversaciones</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Conversaciones</CardTitle>
+          </CardHeader>
           <CardContent className="space-y-3">
             <label className="block space-y-1 text-sm">
               <span>Archivo</span>
@@ -137,7 +146,9 @@ function Inbox({ sellerId }: { sellerId: string | number }) {
               >
                 <option value="">Todos los canales</option>
                 {Object.entries(channels).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
                 ))}
               </select>
             </label>
@@ -145,10 +156,14 @@ function Inbox({ sellerId }: { sellerId: string | number }) {
             {query.isError && (
               <div role="alert">
                 <p>No se pudieron cargar las conversaciones.</p>
-                <Button variant="outline" onClick={() => void query.refetch()}>Reintentar</Button>
+                <Button variant="outline" onClick={() => void query.refetch()}>
+                  Reintentar
+                </Button>
               </div>
             )}
-            {query.isSuccess && items.length === 0 && <p>No hay conversaciones en esta vista.</p>}
+            {query.isSuccess && items.length === 0 && (
+              <p>No hay conversaciones en esta vista.</p>
+            )}
             <ul className="divide-y">
               {items.map((item) => (
                 <li key={item.id}>
@@ -158,21 +173,31 @@ function Inbox({ sellerId }: { sellerId: string | number }) {
                     className="w-full space-y-1 rounded-md p-2 text-left hover:bg-accent aria-pressed:bg-accent"
                     onClick={() => setSelectedId(item.id)}
                   >
-                    <span className="block font-medium">{contactName(item)}</span>
-                    <span className="block text-sm text-muted-foreground">
-                      {channels[item.channel]} · {classifications[item.customer.classification]}
+                    <span className="block font-medium">
+                      {contactName(item)}
                     </span>
-                    <time className="text-xs text-muted-foreground" dateTime={item.last_message_at}>
+                    <span className="block text-sm text-muted-foreground">
+                      {channels[item.channel]} ·{" "}
+                      {classifications[item.customer.classification]}
+                    </span>
+                    <time
+                      className="text-xs text-muted-foreground"
+                      dateTime={item.last_message_at}
+                    >
                       {dateFormat.format(new Date(item.last_message_at))}
                     </time>
                   </button>
                 </li>
               ))}
             </ul>
-            <Pagination page={page} hasNext={query.data?.hasNext} onChange={(next) => {
-              setSelectedId(undefined);
-              setPage(next);
-            }} />
+            <Pagination
+              page={page}
+              hasNext={query.data?.hasNext}
+              onChange={(next) => {
+                setSelectedId(undefined);
+                setPage(next);
+              }}
+            />
           </CardContent>
         </Card>
 
@@ -187,14 +212,20 @@ function Inbox({ sellerId }: { sellerId: string | number }) {
             }}
           />
         ) : (
-          <p className="text-sm text-muted-foreground">Selecciona una conversación para ver la ficha y los mensajes.</p>
+          <p className="text-sm text-muted-foreground">
+            Selecciona una conversación para ver la ficha y los mensajes.
+          </p>
         )}
       </div>
     </section>
   );
 }
 
-function Pagination({ page, hasNext, onChange }: {
+function Pagination({
+  page,
+  hasNext,
+  onChange,
+}: {
   page: number;
   hasNext?: boolean;
   onChange: (page: number) => void;
@@ -203,18 +234,32 @@ function Pagination({ page, hasNext, onChange }: {
 
   return (
     <div className="flex items-center justify-between gap-2">
-      <Button size="sm" variant="outline" disabled={!page} onClick={() => onChange(page - 1)}>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={!page}
+        onClick={() => onChange(page - 1)}
+      >
         Anterior
       </Button>
       <span className="text-sm">Página {page + 1}</span>
-      <Button size="sm" variant="outline" disabled={!hasNext} onClick={() => onChange(page + 1)}>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={!hasNext}
+        onClick={() => onChange(page + 1)}
+      >
         Siguiente
       </Button>
     </div>
   );
 }
 
-function ConversationDetail({ conversation, sellerId, onArchiveChange }: {
+function ConversationDetail({
+  conversation,
+  sellerId,
+  onArchiveChange,
+}: {
   conversation: Conversation;
   sellerId: string | number;
   onArchiveChange: () => void;
@@ -241,7 +286,9 @@ function ConversationDetail({ conversation, sellerId, onArchiveChange }: {
   const staff = staffQuery.data ?? [];
   const actor = staff.find((seller) => String(seller.id) === String(sellerId));
   const canAssign = actor?.administrator && !actor.disabled;
-  const assignee = staff.find((seller) => seller.id === conversation.assigned_sales_id);
+  const assignee = staff.find(
+    (seller) => seller.id === conversation.assigned_sales_id,
+  );
 
   const history = useQuery({
     queryKey: ["inbox", sellerId, "messages", conversation.id, page],
@@ -255,7 +302,10 @@ function ConversationDetail({ conversation, sellerId, onArchiveChange }: {
         .order("id", { ascending: false })
         .range(page * pageSize, (page + 1) * pageSize);
       if (error) throw error;
-      return { items: data.slice(0, pageSize).reverse(), hasNext: data.length > pageSize };
+      return {
+        items: data.slice(0, pageSize).reverse(),
+        hasNext: data.length > pageSize,
+      };
     },
   });
 
@@ -270,9 +320,20 @@ function ConversationDetail({ conversation, sellerId, onArchiveChange }: {
         await setContactArchived(customer.contact_id, change.archived);
         return;
       }
-      const request = "assigned_sales_id" in change
-        ? client.from("inbox_conversations").update(change).eq("id", conversation.id).select("id").single()
-        : client.from("inbox_customers").update(change).eq("contact_id", customer.contact_id).select("contact_id").single();
+      const request =
+        "assigned_sales_id" in change
+          ? client
+              .from("inbox_conversations")
+              .update(change)
+              .eq("id", conversation.id)
+              .select("id")
+              .single()
+          : client
+              .from("inbox_customers")
+              .update(change)
+              .eq("contact_id", customer.contact_id)
+              .select("contact_id")
+              .single();
       const { error } = await request;
       if (error) throw error;
     },
@@ -281,10 +342,16 @@ function ConversationDetail({ conversation, sellerId, onArchiveChange }: {
         onArchiveChange();
         await queryClient.invalidateQueries({ queryKey: ["contacts"] });
       }
-      await queryClient.invalidateQueries({ queryKey: ["inbox", sellerId, "conversations"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["inbox", sellerId, "conversations"],
+      });
       notify("Cambio guardado", { type: "success" });
     },
-    onError: () => notify("No se pudo guardar el cambio. Verifica tus permisos e inténtalo de nuevo.", { type: "error" }),
+    onError: () =>
+      notify(
+        "No se pudo guardar el cambio. Verifica tus permisos e inténtalo de nuevo.",
+        { type: "error" },
+      ),
   });
 
   return (
@@ -294,16 +361,27 @@ function ConversationDetail({ conversation, sellerId, onArchiveChange }: {
           <CardTitle>{contactName(conversation)}</CardTitle>
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary">{channels[conversation.channel]}</Badge>
-            {customer.contact.archived_at && <Badge variant="outline">Archivado</Badge>}
+            {customer.contact.archived_at && (
+              <Badge variant="outline">Archivado</Badge>
+            )}
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1 text-sm">
             {customer.contact.email_jsonb?.map(({ email }, index) => (
-              <p key={index} className="break-all">{email}</p>
+              <p key={index} className="break-all">
+                {email}
+              </p>
             ))}
-            {customer.contact.phone_jsonb?.map(({ number }, index) => <p key={index}>{number}</p>)}
-            <Link className="underline" to={`/contacts/${customer.contact_id}/show`}>Abrir contacto en Atomic CRM</Link>
+            {customer.contact.phone_jsonb?.map(({ number }, index) => (
+              <p key={index}>{number}</p>
+            ))}
+            <Link
+              className="underline"
+              to={`/contacts/${customer.contact_id}/show`}
+            >
+              Abrir contacto en Atomic CRM
+            </Link>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block space-y-1 text-sm">
@@ -312,10 +390,14 @@ function ConversationDetail({ conversation, sellerId, onArchiveChange }: {
                 className={selectClass}
                 value={customer.classification}
                 disabled={mutation.isPending}
-                onChange={(event) => mutation.mutate({ classification: event.target.value })}
+                onChange={(event) =>
+                  mutation.mutate({ classification: event.target.value })
+                }
               >
                 {Object.entries(classifications).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
                 ))}
               </select>
             </label>
@@ -326,56 +408,96 @@ function ConversationDetail({ conversation, sellerId, onArchiveChange }: {
                   className={selectClass}
                   value={conversation.assigned_sales_id ?? ""}
                   disabled={mutation.isPending}
-                  onChange={(event) => mutation.mutate({
-                    assigned_sales_id: event.target.value ? Number(event.target.value) : null,
-                  })}
+                  onChange={(event) =>
+                    mutation.mutate({
+                      assigned_sales_id: event.target.value
+                        ? Number(event.target.value)
+                        : null,
+                    })
+                  }
                 >
                   <option value="">Sin asignar</option>
-                  {staff.filter((seller) => !seller.disabled || seller.id === conversation.assigned_sales_id)
+                  {staff
+                    .filter(
+                      (seller) =>
+                        !seller.disabled ||
+                        seller.id === conversation.assigned_sales_id,
+                    )
                     .map((seller) => (
-                      <option key={seller.id} value={seller.id} disabled={seller.disabled}>
-                        {seller.first_name} {seller.last_name}{seller.disabled ? " (inactivo)" : ""}
+                      <option
+                        key={seller.id}
+                        value={seller.id}
+                        disabled={seller.disabled}
+                      >
+                        {seller.first_name} {seller.last_name}
+                        {seller.disabled ? " (inactivo)" : ""}
                       </option>
                     ))}
                 </select>
               </label>
             ) : (
               <p className="text-sm">
-                Vendedor {assignee ? `${assignee.first_name} ${assignee.last_name}`
-                  : conversation.assigned_sales_id === null ? "sin asignar" : "asignado"}
+                Vendedor{" "}
+                {assignee
+                  ? `${assignee.first_name} ${assignee.last_name}`
+                  : conversation.assigned_sales_id === null
+                    ? "sin asignar"
+                    : "asignado"}
               </p>
             )}
           </div>
-          {staffQuery.isError && <p role="alert">No se pudo cargar la lista de vendedores.</p>}
+          {staffQuery.isError && (
+            <p role="alert">No se pudo cargar la lista de vendedores.</p>
+          )}
           <Button
             variant="outline"
             disabled={mutation.isPending}
-            onClick={() => mutation.mutate({
-              archived: !customer.contact.archived_at,
-            })}
+            onClick={() =>
+              mutation.mutate({
+                archived: !customer.contact.archived_at,
+              })
+            }
           >
-            {customer.contact.archived_at ? "Restaurar cliente" : "Archivar cliente"}
+            {customer.contact.archived_at
+              ? "Restaurar cliente"
+              : "Archivar cliente"}
           </Button>
         </CardContent>
       </Card>
       <Card>
-        <CardHeader><CardTitle>Historial de mensajes</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle>Historial de mensajes</CardTitle>
+        </CardHeader>
         <CardContent className="space-y-4">
           {history.isPending && <p role="status">Cargando mensajes…</p>}
-          {history.isError && <p role="alert">No se pudo cargar el historial.</p>}
-          {history.isSuccess && history.data.items.length === 0 && <p>No hay mensajes.</p>}
+          {history.isError && (
+            <p role="alert">No se pudo cargar el historial.</p>
+          )}
+          {history.isSuccess && history.data.items.length === 0 && (
+            <p>No hay mensajes.</p>
+          )}
           <ol className="space-y-3">
             {history.data?.items.map((message) => (
               <li key={message.id} className="rounded-md border p-3 text-sm">
                 <div className="flex flex-wrap justify-between gap-2 text-muted-foreground">
-                  <span>{message.direction === "incoming" ? "Cliente" : "Vendedor"}</span>
-                  <time dateTime={message.sent_at}>{dateFormat.format(new Date(message.sent_at))}</time>
+                  <span>
+                    {message.direction === "incoming" ? "Cliente" : "Vendedor"}
+                  </span>
+                  <time dateTime={message.sent_at}>
+                    {dateFormat.format(new Date(message.sent_at))}
+                  </time>
                 </div>
-                <p className="mt-1 whitespace-pre-wrap break-words">{message.body}</p>
+                <p className="mt-1 whitespace-pre-wrap break-words">
+                  {message.body}
+                </p>
               </li>
             ))}
           </ol>
-          <Pagination page={page} hasNext={history.data?.hasNext} onChange={setPage} />
+          <Pagination
+            page={page}
+            hasNext={history.data?.hasNext}
+            onChange={setPage}
+          />
         </CardContent>
       </Card>
     </div>

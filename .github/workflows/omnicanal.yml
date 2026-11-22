@@ -22,18 +22,11 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium chromium-headless-shell
       - run: npm run typecheck
+      - run: npm run prettier
+      - run: npx playwright install --with-deps chromium chromium-headless-shell
       - run: npm run build
       - run: npm run test:unit:app -- --run
       - run: npx supabase start
       - run: npx supabase test db
       - run: make test-e2e-ci
-      - name: Check Prettier and print the formatting diff
-        if: ${{ always() }}
-        run: |
-          npm run prettier || {
-            npx prettier --config ./.prettierrc.json --write "**/*.{mjs,js,json,ts,tsx,css,md,html}"
-            git -c color.ui=never diff
-            exit 1
-          }

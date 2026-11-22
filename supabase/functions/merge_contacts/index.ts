@@ -5,11 +5,19 @@ import { corsHeaders, OptionsMiddleware } from "../_shared/cors.ts";
 import { createErrorResponse } from "../_shared/utils.ts";
 import { AuthMiddleware, UserMiddleware } from "../_shared/authentication.ts";
 
-async function mergeContacts(loserId: number, winnerId: number, userId: string) {
+async function mergeContacts(
+  loserId: number,
+  winnerId: number,
+  userId: string,
+) {
   return db.transaction().execute(async (trx) => {
     await trx.executeQuery(CompiledQuery.raw("SET LOCAL ROLE authenticated"));
-    await sql`select set_config('request.jwt.claim.sub', ${userId}, true)`.execute(trx);
-    await sql`select public.merge_contacts(${loserId}::bigint, ${winnerId}::bigint)`.execute(trx);
+    await sql`select set_config('request.jwt.claim.sub', ${userId}, true)`.execute(
+      trx,
+    );
+    await sql`select public.merge_contacts(${loserId}::bigint, ${winnerId}::bigint)`.execute(
+      trx,
+    );
     return { success: true, winnerId };
   });
 }

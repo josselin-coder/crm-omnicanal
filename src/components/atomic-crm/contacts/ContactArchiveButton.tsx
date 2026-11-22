@@ -15,15 +15,25 @@ export function ContactArchiveButton({ contact }: { contact: Contact }) {
     onSuccess: async () => {
       refresh();
       await queryClient.invalidateQueries({ queryKey: ["inbox"] });
-      notify(archived ? "Cliente restaurado" : "Cliente archivado", { type: "success" });
+      notify(archived ? "Cliente restaurado" : "Cliente archivado", {
+        type: "success",
+      });
     },
-    onError: () => notify("No se pudo cambiar el estado de archivo del cliente.", { type: "error" }),
+    onError: () =>
+      notify("No se pudo cambiar el estado de archivo del cliente.", {
+        type: "error",
+      }),
   });
 
   if (!config.supabaseUrl) return null;
 
   return (
-    <Button variant="outline" size="sm" disabled={mutation.isPending} onClick={() => mutation.mutate()}>
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={mutation.isPending}
+      onClick={() => mutation.mutate()}
+    >
       {archived ? "Restaurar cliente" : "Archivar cliente"}
     </Button>
   );
