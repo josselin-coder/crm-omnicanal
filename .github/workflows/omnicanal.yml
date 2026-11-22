@@ -1,0 +1,32 @@
+name: Omnichannel phase 1
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/components/atomic-crm/**'
+      - 'supabase/**'
+      - '.github/workflows/omnicanal.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run prettier
+      - run: npx playwright install --with-deps chromium chromium-headless-shell
+      - run: npm run build
+      - run: npm run test:unit:app -- --run
+      - run: npx supabase start
+      - run: npx supabase test db
+      - run: make test-e2e-ci
