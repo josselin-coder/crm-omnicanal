@@ -23,7 +23,13 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
-      - run: npm run prettier
+      - name: Check formatting
+        run: |
+          npm run prettier || {
+            npx prettier --config ./.prettierrc.json --write "**/*.{mjs,js,json,ts,tsx,css,md,html}"
+            git -c color.ui=never diff
+            exit 1
+          }
       - run: npm run lint
       - run: npx playwright install --with-deps chromium chromium-headless-shell
       - run: npm run build
@@ -39,4 +45,4 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - run: deno check --no-lock --node-modules-dir=none supabase/functions/whatsapp-inbox/index.ts supabase/functions/whatsapp-webhook/index.ts
+      - run: deno check --no-lock --node-modules-dir=none supabase/functions/whatsapp-inbox/index.ts supabase/functions/whatsapp-webhook/index.ts supabase/functions/crm-assistant/index.ts

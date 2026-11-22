@@ -15,6 +15,8 @@ export function InboxNotifications() {
     const client = getSupabaseClient();
     const refreshInbox = () =>
       void queryClient.invalidateQueries({ queryKey: ["inbox", sellerId] });
+    const refreshAssistant = () =>
+      void queryClient.invalidateQueries({ queryKey: ["assistant", sellerId] });
     const recent = new Set<string>();
     const subscription = client
       .channel(`crm-inbox-${sellerId}`)
@@ -45,8 +47,27 @@ export function InboxNotifications() {
           notify("Nuevo mensaje de WhatsApp", { type: "info" });
         },
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "assistant_states" },
+        refreshAssistant,
+      )
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "assistant_decisions" },
+        ({ new: decision }) => {
+          refreshAssistant();
+          refreshInbox();
+          if (decision.action === "handoff") {
+            notify("Una conversación requiere atención de un asesor", { type: "info" });
+          }
+        },
+      )
       .subscribe((status) => {
-        if (status === "SUBSCRIBED") refreshInbox();
+        if (status === "SUBSCRIBED") {
+          refreshInbox();
+          refreshAssistant();
+        }
       });
 
     return () => {

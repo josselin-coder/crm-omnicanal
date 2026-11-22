@@ -1,3 +1,5 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { observeConversation } from "../_shared/assistantObserver.ts";
 import { supabaseAdmin } from "../_shared/supabaseAdmin.ts";
 import {
   BodyTooLarge,
@@ -136,14 +138,18 @@ async function receive(req: Request) {
       throw new Error("WhatsApp contact identity could not be updated");
   }
 
+  const touched = new Set<string>();
   for (const message of messages) {
     const { data: existing, error: findError } = await supabaseAdmin
       .from("inbox_messages")
-      .select("id")
+      .select("conversation_id")
       .eq("provider_message_id", message.id)
       .maybeSingle();
     if (findError) throw new Error("Message lookup failed");
-    if (existing) continue;
+    if (existing) {
+      touched.add(existing.conversation_id);
+      continue;
+    }
 
     const media = await saveMedia(message, settings);
     const { error } = await supabaseAdmin.rpc("receive_whatsapp_message", {
@@ -163,6 +169,14 @@ async function receive(req: Request) {
       media_mime: media?.mime ?? null,
     });
     if (error) throw new Error("Message could not be recorded");
+
+    const { data: saved, error: savedError } = await supabaseAdmin
+      .from("inbox_messages")
+      .select("conversation_id")
+      .eq("provider_message_id", message.id)
+      .single();
+    if (savedError) throw new Error("Could not locate the inbound conversation");
+    touched.add(saved.conversation_id);
   }
 
   for (const delivery of deliveries) {
@@ -173,6 +187,20 @@ async function receive(req: Request) {
       next_status: delivery.status,
     });
     if (error) throw new Error("Delivery status could not be recorded");
+  }
+
+  if (touched.size) {
+    EdgeRuntime.waitUntil((async () => {
+      const { data, error } = await supabaseAdmin
+        .from("assistant_states")
+        .select("conversation_id")
+        .eq("mode", "observe")
+        .in("conversation_id", [...touched]);
+      if (error) throw error;
+      for (const row of data) {
+        await observeConversation(row.conversation_id);
+      }
+    })().catch(() => console.error("CRM assistant observation could not be completed")));
   }
 
   return new Response("OK");

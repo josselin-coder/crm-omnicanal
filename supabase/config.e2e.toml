@@ -173,3 +173,7 @@ verify_jwt = false
 # The inbox endpoint validates the actual user token with Supabase Auth.
 [functions.whatsapp-inbox]
 verify_jwt = false
+
+# The assistant validates the signed-in user's access inside the function.
+[functions.crm-assistant]
+verify_jwt = false
