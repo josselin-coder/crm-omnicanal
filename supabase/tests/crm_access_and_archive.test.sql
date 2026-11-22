@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(20);
+select plan(24);
 
 insert into public.user_invitations (user_id) values
     ('91000000-0000-4000-8000-000000000001'),
@@ -71,6 +71,19 @@ set local request.jwt.claim.sub = '91000000-0000-4000-8000-000000000001';
 select is(merge_contacts(9100002, 9100001), 9100001::bigint, 'An administrator can merge the contacts');
 select is((select contact_id from inbox_conversations where id = '91000000-0000-4000-8000-000000000004'),
     9100001::bigint, 'Merge preserves the inbox conversation under the surviving contact');
+
+select ok((select archived_at is not null from contacts_summary where id = 9100002),
+    'The original contact is retained as archived after a merge');
+select is((select body from inbox_messages where conversation_id = '91000000-0000-4000-8000-000000000004'),
+    'Original message', 'Merge preserves the original message');
+
+delete from companies where id = 9100001;
+select ok((select company_id is null from contacts where id = 9100001),
+    'Company deletion detaches the contact without deleting its history');
+
+reset role;
+select is((select text from contact_notes where id = 9100001 and archived_at is not null),
+    'Private contact note', 'The archived note and its content are retained in storage');
 
 select * from finish();
 rollback;

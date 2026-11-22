@@ -80,7 +80,7 @@ with check (public.crm_can_manage_record(sales_id) or exists (
 create function public.restrict_contact_owner_change()
 returns trigger
 language plpgsql security invoker set search_path = ''
-as $
+as $$
 begin
     if new.sales_id is distinct from old.sales_id
        and auth.uid() is not null and not public.crm_can_manage_record(null) then
@@ -88,7 +88,7 @@ begin
     end if;
     return new;
 end;
-$;
+$$;
 create trigger restrict_contact_owner_change before update of sales_id on public.contacts
 for each row execute function public.restrict_contact_owner_change();
 
