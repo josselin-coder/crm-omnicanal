@@ -1,5 +1,3 @@
-create extension if not exists "pgjwt" with schema "extensions";
-
 alter table "public"."sales" alter column "first_name" set default 'Pending'::text;
 
 alter table "public"."sales" alter column "last_name" set default 'Pending'::text;
