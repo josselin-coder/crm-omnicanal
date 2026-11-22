@@ -1,4 +1,4 @@
-name: Omnichannel phase 1
+name: Omnichannel
 
 on:
   pull_request:
@@ -24,9 +24,19 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run prettier
+      - run: npm run lint
       - run: npx playwright install --with-deps chromium chromium-headless-shell
       - run: npm run build
       - run: npm run test:unit:app -- --run
       - run: npx supabase start
       - run: npx supabase test db
       - run: make test-e2e-ci
+  edge:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check --no-lock --node-modules-dir=none supabase/functions/whatsapp-inbox/index.ts supabase/functions/whatsapp-webhook/index.ts

@@ -1,3 +1,4 @@
+import { InboxNotifications } from "../inbox/InboxNotifications";
 import { Error } from "@/components/admin/error";
 import { Notification } from "@/components/admin/notification";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,6 +15,7 @@ export const MobileLayout = ({ children }: { children: ReactNode }) => {
   useConfigurationLoader();
   return (
     <DataImportProvider>
+      <InboxNotifications />
       <ScrollRestoration />
       <PullToRefresh />
       <ErrorBoundary FallbackComponent={Error}>

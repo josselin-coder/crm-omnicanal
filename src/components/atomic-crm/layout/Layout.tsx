@@ -1,3 +1,4 @@
+import { InboxNotifications } from "../inbox/InboxNotifications";
 import { Suspense, type ReactNode } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { Notification } from "@/components/admin/notification";
@@ -12,6 +13,7 @@ export const Layout = ({ children }: { children: ReactNode }) => {
   useConfigurationLoader();
   return (
     <DataImportProvider>
+      <InboxNotifications />
       <Header />
       <main className="max-w-screen-xl mx-auto p-4" id="main-content">
         <ErrorBoundary FallbackComponent={Error}>

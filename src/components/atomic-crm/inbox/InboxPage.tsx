@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { WhatsAppAttachment, WhatsAppComposer } from "./WhatsAppConversation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useGetIdentity, useNotify } from "ra-core";
 import { Link } from "react-router";
@@ -8,6 +9,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSupabaseClient } from "../providers/supabase/supabase";
 import { setContactArchived } from "../providers/supabase/setContactArchived";
 import { config } from "../root/config";
+
+const deliveryLabels: Record<string, string> = {
+  pending: "Pendiente de confirmación",
+  accepted: "Recibido por WhatsApp",
+  sent: "Enviado",
+  delivered: "Entregado",
+  read: "Leído",
+  failed: "Envío rechazado",
+  unknown: "Entrega sin confirmar",
+};
 
 const channels = {
   whatsapp: "WhatsApp",
@@ -37,6 +48,8 @@ type Conversation = {
   channel: Channel;
   assigned_sales_id: number | null;
   last_message_at: string;
+  last_inbound_at: string | null;
+  whatsapp_phone_id: string | null;
   customer: {
     contact_id: number;
     classification: keyof typeof classifications;
@@ -83,7 +96,7 @@ function Inbox({ sellerId }: { sellerId: string | number }) {
       let request = client
         .from("inbox_conversations")
         .select(
-          "id, channel, assigned_sales_id, last_message_at, customer:inbox_customers!inner(contact_id, classification, contact:contacts!inner(archived_at, first_name, last_name, email_jsonb, phone_jsonb))",
+          "id, channel, assigned_sales_id, last_message_at, last_inbound_at, whatsapp_phone_id, customer:inbox_customers!inner(contact_id, classification, contact:contacts!inner(archived_at, first_name, last_name, email_jsonb, phone_jsonb))",
         );
       request = archived
         ? request.not("customer.contact.archived_at", "is", null)
@@ -109,7 +122,7 @@ function Inbox({ sellerId }: { sellerId: string | number }) {
       <div>
         <h2 className="text-2xl font-semibold">Bandeja omnicanal</h2>
         <p className="text-sm text-muted-foreground">
-          Entorno de prueba con conversaciones simuladas.
+          WhatsApp Business y conversaciones de demostración.
         </p>
       </div>
       <div className="grid items-start gap-4 md:grid-cols-[minmax(15rem,1fr)_minmax(0,2fr)]">
@@ -286,6 +299,15 @@ function ConversationDetail({
   const staff = staffQuery.data ?? [];
   const actor = staff.find((seller) => String(seller.id) === String(sellerId));
   const canAssign = actor?.administrator && !actor.disabled;
+  const canReply =
+    actor &&
+    !actor.disabled &&
+    (actor.administrator || actor.id === conversation.assigned_sales_id) &&
+    !customer.contact.archived_at;
+  const lastInbound = conversation.last_inbound_at;
+  const windowOpen = Boolean(
+    lastInbound && Date.now() - Date.parse(lastInbound) < 86_400_000,
+  );
   const assignee = staff.find(
     (seller) => seller.id === conversation.assigned_sales_id,
   );
@@ -296,7 +318,7 @@ function ConversationDetail({
     queryFn: async () => {
       const { data, error } = await client
         .from("inbox_messages")
-        .select("id, direction, body, sent_at")
+        .select("id, direction, body, sent_at, attachment_name, send_status")
         .eq("conversation_id", conversation.id)
         .order("sent_at", { ascending: false })
         .order("id", { ascending: false })
@@ -361,6 +383,9 @@ function ConversationDetail({
           <CardTitle>{contactName(conversation)}</CardTitle>
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary">{channels[conversation.channel]}</Badge>
+            {!conversation.whatsapp_phone_id && (
+              <Badge variant="outline">Demostración</Badge>
+            )}
             {customer.contact.archived_at && (
               <Badge variant="outline">Archivado</Badge>
             )}
@@ -403,7 +428,11 @@ function ConversationDetail({
             </label>
             {canAssign ? (
               <label className="block space-y-1 text-sm">
-                <span>Vendedor</span>
+                <span>
+                  {conversation.assigned_sales_id
+                    ? "Transferir a vendedor"
+                    : "Asignar vendedor"}
+                </span>
                 <select
                   className={selectClass}
                   value={conversation.assigned_sales_id ?? ""}
@@ -490,6 +519,17 @@ function ConversationDetail({
                 <p className="mt-1 whitespace-pre-wrap break-words">
                   {message.body}
                 </p>
+                {message.attachment_name && (
+                  <WhatsAppAttachment
+                    messageId={message.id}
+                    name={message.attachment_name}
+                  />
+                )}
+                {message.send_status && (
+                  <p className="text-xs text-muted-foreground">
+                    {deliveryLabels[message.send_status]}
+                  </p>
+                )}
               </li>
             ))}
           </ol>
@@ -498,6 +538,16 @@ function ConversationDetail({
             hasNext={history.data?.hasNext}
             onChange={setPage}
           />
+          {conversation.whatsapp_phone_id &&
+            canReply &&
+            (windowOpen ? (
+              <WhatsAppComposer conversationId={conversation.id} />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                La ventana de 24 horas está cerrada. El cliente debe enviar un
+                nuevo mensaje para habilitar respuestas de texto.
+              </p>
+            ))}
         </CardContent>
       </Card>
     </div>

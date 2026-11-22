@@ -166,3 +166,10 @@ verify_jwt = false
 verify_jwt = false
 [functions.users]
 verify_jwt = false
+
+# Meta calls the webhook without a Supabase JWT. The handler validates its HMAC.
+[functions.whatsapp-webhook]
+verify_jwt = false
+# The inbox endpoint validates the actual user token with Supabase Auth.
+[functions.whatsapp-inbox]
+verify_jwt = false
