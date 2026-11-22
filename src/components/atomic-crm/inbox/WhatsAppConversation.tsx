@@ -130,7 +130,7 @@ export function WhatsAppAttachment({
     setLoading(true);
     try {
       const { data, error } = await getSupabaseClient().functions.invoke<{
-        url: string;
+        path: string;
       }>("whatsapp-inbox", {
         body: { action: "attachment", messageId },
       });
