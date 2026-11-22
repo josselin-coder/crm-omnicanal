@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(30);
+select plan(35);
 
 insert into public.user_invitations (user_id) values
     ('93000000-0000-4000-8000-000000000001'),
@@ -67,7 +67,7 @@ select is((select job->'transcript'->-1->>'text' from assistant_claim), 'Ya no m
     'Same-timestamp messages are analyzed in arrival order');
 select ok(finish_assistant_observation((select id from assistant_fixture),
     (select (job->>'token')::uuid from assistant_claim), (select (job->>'revision')::bigint from assistant_claim),
-    '{"action":"stopped","classification":"descartado","reason":"declined","engine":"rules","facts":{}}'),
+    '{"action":"stopped","classification":"descartado","reason":"declined","engine":"rules","facts":{"name":"Luz","service":"grabado","quantity":20,"files":["diseño.dxf"]}}'),
     'Rejection is recorded after the handoff');
 select is((select classification from inbox_customers where contact_id = (select contact_id from assistant_fixture)),
     'descartado', 'The latest rejection replaces the previous readiness');
@@ -76,6 +76,13 @@ select is((select count(*) from inbox_messages where conversation_id = (select i
 
 select is(control_inbox_assistant('93000000-0000-4000-8000-000000000001',
     (select id from assistant_fixture),'take_control'), 'human', 'Seller can take control');
+select is((select classification from inbox_customers where contact_id = (select contact_id from assistant_fixture)),
+    'descartado', 'Taking control preserves the stored rejected classification');
+select is((select facts from assistant_decisions where conversation_id = (select id from assistant_fixture)
+    order by revision desc limit 1), '{"name":"Luz","service":"grabado","quantity":20,"files":["diseño.dxf"]}'::jsonb,
+    'Taking control preserves the recorded service, quantity and files');
+select is((select count(*) from inbox_messages where conversation_id = (select id from assistant_fixture)),
+    4::bigint, 'Taking control preserves the conversation history');
 select is(control_inbox_assistant('93000000-0000-4000-8000-000000000001',
     (select id from assistant_fixture),'enable'), 'human', 'Human control is not reset by enabling observation');
 select is(claim_assistant_observation((select id from assistant_fixture)), null::jsonb, 'Worker stops after takeover');
@@ -118,6 +125,22 @@ select is(finish_assistant_observation((select id from assistant_unassigned),
     true, 'An unassigned conversation can be handed off');
 select is((select assigned_sales_id from inbox_conversations where id = (select id from assistant_unassigned)),
     (select id from sales where email = 'assistant-other@example.invalid'), 'Handoff assigns the active seller with the lower workload');
+
+select receive_whatsapp_message('930','9312345681','Cliente interesado','wamid.assistant.interested',now(),
+    'Quiero grabar una placa','text',null,null,null);
+select receive_whatsapp_message('930','9312345682','Cliente listo','wamid.assistant.ready',now(),
+    'Quiero encargar un pedido','text',null,null,null);
+update inbox_customers as customer
+set classification = case conversation.whatsapp_sender when '9312345681' then 'interesado' else 'listo_para_ventas' end
+from inbox_conversations as conversation
+where conversation.whatsapp_phone_id = '930' and conversation.whatsapp_sender in ('9312345681','9312345682')
+  and conversation.contact_id = customer.contact_id;
+select control_inbox_assistant('93000000-0000-4000-8000-000000000003', id, 'take_control')
+from inbox_conversations where whatsapp_phone_id = '930' and whatsapp_sender in ('9312345681','9312345682');
+select is((select classification from inbox_customers join inbox_conversations using (contact_id) where whatsapp_sender = '9312345681'),
+    'interesado', 'Taking control preserves an interested customer');
+select is((select classification from inbox_customers join inbox_conversations using (contact_id) where whatsapp_sender = '9312345682'),
+    'listo_para_ventas', 'Taking control preserves a sales-ready customer');
 
 select * from finish();
 rollback;

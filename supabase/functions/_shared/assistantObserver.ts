@@ -48,10 +48,8 @@ export async function analyze(
   transcript: Turn[] | null,
   now: Date,
   useModel: boolean,
-  stopped = false,
   afterHandoff = false,
 ): Promise<Decision> {
-  if (stopped) return decide(transcript ?? [], now, { stopped: true });
   if (!transcript) return decide([], now, { overflow: true });
   if (!useModel) return decide(transcript, now, { afterHandoff });
 
@@ -79,7 +77,6 @@ export async function observeConversation(conversationId: string) {
     parseTranscript(claim.transcript),
     new Date(),
     true,
-    false,
     claim.mode === "handoff",
   );
   const { data: saved, error: saveError } = await supabaseAdmin.rpc(

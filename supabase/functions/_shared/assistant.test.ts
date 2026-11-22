@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decide, proposalFor, type Turn } from "./assistant";
+import { decide, proposalFor, stopAssistant, type Turn } from "./assistant";
 import { validateExtraction } from "./assistantModel";
 
 const when = new Date("2026-11-22T14:00:00Z");
@@ -204,13 +204,26 @@ describe("Commercial assistant", () => {
     ).toBe("price_request");
   });
 
-  it("stops when a seller takes control, even for a price request", () => {
-    const decision = decide([customer("¿Qué precio tiene?")], when, {
-      stopped: true,
-    });
-    expect(decision.action).toBe("stopped");
-    expect(proposalFor(decision.action)).toBeNull();
-  });
+  it.each(["descartado", "interesado", "listo_para_ventas"] as const)(
+    "retains the last %s classification and facts when the seller takes control",
+    (classification) => {
+      const lastDecision = {
+        classification,
+        engine: "model" as const,
+        facts: {
+          name: "Luz",
+          service: "grabado" as const,
+          quantity: 12,
+          files: ["placa.dxf", "referencia.png"],
+        },
+      };
+      const stopped = stopAssistant(lastDecision);
+      expect(stopped).toMatchObject(lastDecision);
+      expect(stopped.action).toBe("stopped");
+      expect(stopped.reason).toBe("human_control");
+      expect(proposalFor(stopped.action)).toBeNull();
+    },
+  );
 
   it("rejects untrusted actions and model fields that could carry free-form proposals", () => {
     const extraction = {

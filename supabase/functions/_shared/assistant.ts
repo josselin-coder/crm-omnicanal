@@ -235,13 +235,18 @@ function latestSignal(turns: Turn[], model?: Extraction): Signal | undefined {
   }
 }
 
+export function stopAssistant(
+  lastDecision: Pick<Decision, "classification" | "engine" | "facts">,
+): Decision {
+  return { ...lastDecision, action: "stopped", reason: "human_control" };
+}
+
 export function decide(
   turns: Turn[],
   now: Date,
   options: {
     model?: Extraction;
     engine?: Engine;
-    stopped?: boolean;
     overflow?: boolean;
     afterHandoff?: boolean;
   } = {},
@@ -312,7 +317,6 @@ export function decide(
     reason: Reason,
   ): Decision => ({ action, classification, reason, engine, facts });
 
-  if (options.stopped) return result("stopped", "nuevo", "human_control");
   if (options.overflow) return result("handoff", "indeciso", "history_limit");
   const signal = latestSignal(turns, model);
   if (signal === "declined") return result("stopped", "descartado", "declined");
