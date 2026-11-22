@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNotify } from "ra-core";
 import { Button } from "@/components/ui/button";
 import { getSupabaseClient } from "../providers/supabase/supabase";
+import { config } from "../root/config";
 
 const sendErrors: Record<string, string> = {
   forbidden: "Ya no tienes permiso para responder a esta conversación.",
@@ -133,9 +134,14 @@ export function WhatsAppAttachment({
       }>("whatsapp-inbox", {
         body: { action: "attachment", messageId },
       });
-      if (error || !data?.url) throw error;
+      if (
+        error ||
+        !data?.path?.startsWith("/storage/v1/object/sign/whatsapp-media/")
+      ) {
+        throw new Error("Attachment is unavailable");
+      }
       const link = document.createElement("a");
-      link.href = data.url;
+      link.href = new URL(data.path, config.supabaseUrl).href;
       link.rel = "noreferrer";
       link.click();
     } catch {

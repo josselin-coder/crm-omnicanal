@@ -73,7 +73,8 @@ Deno.serve((req) =>
           download: message.attachment_name || true,
         });
       if (signedError) return respond({ error: "attachment_unavailable" }, 503);
-      return respond({ url: data.signedUrl });
+      const url = new URL(data.signedUrl);
+      return respond({ path: url.pathname + url.search });
     }
 
     if (payload.action !== "send")

@@ -132,7 +132,8 @@ async function receive(req: Request) {
       next_user_id: change.next,
       next_phone: change.phone,
     });
-    if (error) throw new Error("WhatsApp contact identity could not be updated");
+    if (error)
+      throw new Error("WhatsApp contact identity could not be updated");
   }
 
   for (const message of messages) {

@@ -146,7 +146,9 @@ describe("WhatsApp webhook input", () => {
     expect(parsed.identityChanges).toEqual([
       { previous: "PE.Previous", next: "PE.New", phone: null },
     ]);
-    expect(whatsappDestination("PE.ABC123")).toEqual({ recipient: "PE.ABC123" });
+    expect(whatsappDestination("PE.ABC123")).toEqual({
+      recipient: "PE.ABC123",
+    });
     expect(whatsappDestination("5112345678")).toEqual({ to: "5112345678" });
   });
 

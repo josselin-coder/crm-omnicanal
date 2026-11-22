@@ -22,7 +22,7 @@ En Meta, registra `https://<proyecto>.supabase.co/functions/v1/whatsapp-webhook`
 ## Operación
 
 1. Envía un mensaje desde un número de prueba habilitado en Meta. El CRM crea un contacto y una conversación sin asignar para esa identidad de WhatsApp. El CRM admite el identificador de usuario de Meta (BSUID) aunque el webhook omita el teléfono.
-2. Entra como administrador y asigna la conversación. El administrador también puede transferirla a otro vendedor activo. El vendedor anterior pierde acceso a la conversación y sus adjuntos cuando la asignación cambia.
+2. Entra como administrador y asigna la conversación. El administrador también puede transferirla a otro vendedor activo. El vendedor anterior pierde acceso a la conversación y a nuevos enlaces de adjuntos cuando la asignación cambia. Los enlaces ya emitidos vencen en un máximo de 60 segundos.
 3. Responde desde la bandeja durante la ventana de 24 horas desde el último mensaje del cliente. Los estados de Meta se incorporan al historial. Ante una entrega sin confirmar, consulta el historial antes de iniciar un envío nuevo.
 4. Envía una imagen o un documento desde el número de prueba. Los archivos de hasta 20 MiB se guardan en un bucket privado. El CRM genera un enlace de descarga con una vigencia de 60 segundos para los agentes autorizados.
 5. Con una sesión del CRM abierta, los mensajes nuevos visibles para esa sesión generan una notificación y actualizan la bandeja mediante Supabase Realtime.
