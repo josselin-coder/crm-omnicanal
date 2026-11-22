@@ -1,5 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { observeConversation } from "../_shared/assistantObserver.ts";
+import {
+  observeConversation,
+  queueObservation,
+} from "../_shared/assistantObserver.ts";
 import { supabaseAdmin } from "../_shared/supabaseAdmin.ts";
 import {
   BodyTooLarge,
@@ -175,7 +178,8 @@ async function receive(req: Request) {
       .select("conversation_id")
       .eq("provider_message_id", message.id)
       .single();
-    if (savedError) throw new Error("Could not locate the inbound conversation");
+    if (savedError)
+      throw new Error("Could not locate the inbound conversation");
     touched.add(saved.conversation_id);
   }
 
@@ -190,17 +194,19 @@ async function receive(req: Request) {
   }
 
   if (touched.size) {
-    EdgeRuntime.waitUntil((async () => {
-      const { data, error } = await supabaseAdmin
-        .from("assistant_states")
-        .select("conversation_id")
-        .eq("mode", "observe")
-        .in("conversation_id", [...touched]);
-      if (error) throw error;
-      for (const row of data) {
-        await observeConversation(row.conversation_id);
-      }
-    })().catch(() => console.error("CRM assistant observation could not be completed")));
+    await queueObservation(
+      (async () => {
+        const { data, error } = await supabaseAdmin
+          .from("assistant_states")
+          .select("conversation_id")
+          .eq("mode", "observe")
+          .in("conversation_id", [...touched]);
+        if (error) throw error;
+        for (const row of data) {
+          await observeConversation(row.conversation_id);
+        }
+      })(),
+    );
   }
 
   return new Response("OK");

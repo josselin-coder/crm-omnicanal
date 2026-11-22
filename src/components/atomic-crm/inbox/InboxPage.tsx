@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { WhatsAppAttachment, WhatsAppComposer } from "./WhatsAppConversation";
-import { AssistantObservation, AssistantSimulator } from "./CommercialAssistant";
+import {
+  AssistantObservation,
+  AssistantSimulator,
+} from "./CommercialAssistant";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useGetIdentity, useNotify } from "ra-core";
 import { Link } from "react-router";

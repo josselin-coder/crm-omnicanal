@@ -22,17 +22,28 @@ export function validateExtraction(value: unknown): Extraction | undefined {
   if (
     Object.keys(x).length !== Object.keys(properties).length ||
     !(x.name === null || (typeof x.name === "string" && x.name.length <= 70)) ||
-    !(x.service === null || services.some((service) => service === x.service)) ||
-    !(x.quantity === null || (typeof x.quantity === "number" && Number.isInteger(x.quantity) && x.quantity > 0 && x.quantity <= 999999)) ||
+    !(
+      x.service === null || services.some((service) => service === x.service)
+    ) ||
+    !(
+      x.quantity === null ||
+      (typeof x.quantity === "number" &&
+        Number.isInteger(x.quantity) &&
+        x.quantity > 0 &&
+        x.quantity <= 999999)
+    ) ||
     typeof x.noDesign !== "boolean" ||
     !intentValues.some((intent) => intent === x.intent) ||
     typeof x.humanRequested !== "boolean" ||
     typeof x.priceRequested !== "boolean"
-  ) return undefined;
+  )
+    return undefined;
   return x as Extraction;
 }
 
-export async function extractWithModel(turns: Turn[]): Promise<Extraction | undefined> {
+export async function extractWithModel(
+  turns: Turn[],
+): Promise<Extraction | undefined> {
   const apiKey = Deno.env.get("OPENAI_API_KEY");
   const model = Deno.env.get("OPENAI_ASSISTANT_MODEL");
   if (!apiKey || !model) return undefined;
@@ -41,11 +52,16 @@ export async function extractWithModel(turns: Turn[]): Promise<Extraction | unde
     role,
     text: text
       .replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g, "[correo]")
-      .replace(/(?<![\p{L}\d])\+?\d(?:[ -]?\d){7,}(?![\p{L}\d])/gu, "[teléfono]"),
-    attachment: attachment ? {
-      kind: attachment.kind,
-      extension: attachment.name.match(/\.[a-z0-9]{1,8}$/i)?.[0] ?? null,
-    } : null,
+      .replace(
+        /(?<![\p{L}\d])\+?\d(?:[ -]?\d){7,}(?![\p{L}\d])/gu,
+        "[teléfono]",
+      ),
+    attachment: attachment
+      ? {
+          kind: attachment.kind,
+          extension: attachment.name.match(/\.[a-z0-9]{1,8}$/i)?.[0] ?? null,
+        }
+      : null,
   }));
 
   try {
@@ -53,7 +69,10 @@ export async function extractWithModel(turns: Turn[]): Promise<Extraction | unde
       method: "POST",
       redirect: "error",
       signal: AbortSignal.timeout(12_000),
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
       body: JSON.stringify({
         model,
         store: false,
@@ -85,11 +104,13 @@ export async function extractWithModel(turns: Turn[]): Promise<Extraction | unde
     });
     if (!response.ok) return undefined;
     const result = object(await response.json());
-    if (result.status !== "completed" || !Array.isArray(result.output)) return undefined;
+    if (result.status !== "completed" || !Array.isArray(result.output))
+      return undefined;
 
     for (const raw of result.output) {
       const message = object(raw);
-      if (message.type !== "message" || !Array.isArray(message.content)) continue;
+      if (message.type !== "message" || !Array.isArray(message.content))
+        continue;
       for (const rawContent of message.content) {
         const content = object(rawContent);
         if (content.type === "output_text") {

@@ -59,7 +59,9 @@ export function InboxNotifications() {
           refreshAssistant();
           refreshInbox();
           if (decision.action === "handoff") {
-            notify("Una conversación requiere atención de un asesor", { type: "info" });
+            notify("Una conversación requiere atención de un asesor", {
+              type: "info",
+            });
           }
         },
       )
