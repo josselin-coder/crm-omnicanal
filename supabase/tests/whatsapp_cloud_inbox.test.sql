@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(17);
+select plan(21);
 
 insert into public.user_invitations (user_id) values
     ('92000000-0000-4000-8000-000000000001'),
@@ -67,6 +67,16 @@ update inbox_conversations set last_inbound_at = now() - interval '25 hours' whe
 select is(reserve_whatsapp_send('92000000-0000-4000-8000-000000000003',
     (select id from test_wa_thread), '92000000-0000-4000-8000-000000000005','920','Hola')->>'error',
     'window_closed', 'The new seller cannot send free-form replies outside the service window');
+
+select ok(receive_whatsapp_message('921','51111111112','Identidad WhatsApp','wamid.alias.first',now(),
+    'Hola','text',null,null,null,'PE.ABC123'), 'Phone and BSUID can be registered together');
+select ok(receive_whatsapp_message('921',null,'Identidad WhatsApp','wamid.alias.second',now(),
+    'Hola de nuevo','text',null,null,null,'PE.ABC123'), 'A customer can send a message with only their BSUID');
+select is((select count(*) from inbox_conversations where whatsapp_phone_id = '921'), 1::bigint,
+    'Omission of a known phone number does not create a second conversation');
+select rotate_whatsapp_identity('921','PE.ABC123','PE.XYZ987',null);
+select is((select whatsapp_user_id from inbox_conversations where whatsapp_phone_id = '921'), 'PE.XYZ987',
+    'A system event updates the identity without creating a new conversation');
 
 select * from finish();
 rollback;

@@ -120,11 +120,21 @@ async function receive(req: Request) {
     return new Response(null, { status: 400 });
   }
 
-  const { messages, deliveries } = extractEvents(
+  const { messages, deliveries, identityChanges } = extractEvents(
     payload,
     accountId,
     settings.phoneId,
   );
+  for (const change of identityChanges) {
+    const { error } = await supabaseAdmin.rpc("rotate_whatsapp_identity", {
+      phone_id: settings.phoneId,
+      previous_user_id: change.previous,
+      next_user_id: change.next,
+      next_phone: change.phone,
+    });
+    if (error) throw new Error("WhatsApp contact identity could not be updated");
+  }
+
   for (const message of messages) {
     const { data: existing, error: findError } = await supabaseAdmin
       .from("inbox_messages")
@@ -138,6 +148,7 @@ async function receive(req: Request) {
     const { error } = await supabaseAdmin.rpc("receive_whatsapp_message", {
       phone_id: settings.phoneId,
       sender: message.sender,
+      sender_user_id: message.userId,
       sender_name: message.name,
       provider_id: message.id,
       received_at: message.timestamp,

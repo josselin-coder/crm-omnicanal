@@ -8,6 +8,7 @@ import {
   readLimited,
   string,
   uuidPattern,
+  whatsappDestination,
 } from "../_shared/whatsapp.ts";
 
 const bucket = "whatsapp-media";
@@ -123,7 +124,7 @@ Deno.serve((req) =>
           body: JSON.stringify({
             messaging_product: "whatsapp",
             recipient_type: "individual",
-            to: claim.recipient,
+            ...whatsappDestination(string(claim.recipient)),
             type: "text",
             text: { body: text, preview_url: false },
             biz_opaque_callback_data: requestId,

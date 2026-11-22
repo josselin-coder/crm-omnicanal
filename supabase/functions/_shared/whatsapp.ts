@@ -1,4 +1,5 @@
 const phonePattern = /^\d{1,32}$/;
+const userIdPattern = /^[A-Z]{2}\.[A-Za-z0-9]{1,128}$/;
 const providerPattern = /^wamid\.[A-Za-z0-9._+=/-]{1,500}$/;
 export const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -9,7 +10,8 @@ type MediaKind = (typeof mediaKinds)[number];
 
 export type Incoming = {
   id: string;
-  sender: string;
+  sender: string | null;
+  userId: string | null;
   name: string;
   timestamp: string;
   kind: "text" | MediaKind | "unsupported";
@@ -17,6 +19,18 @@ export type Incoming = {
   mediaId?: string;
   filename?: string;
 };
+
+type IdentityChange = {
+  previous: string;
+  next: string;
+  phone: string | null;
+};
+
+export function whatsappDestination(identifier: string) {
+  return phonePattern.test(identifier)
+    ? { to: identifier }
+    : { recipient: identifier };
+}
 
 export type Delivery = {
   id: string;
@@ -96,12 +110,17 @@ export function extractEvents(
   accountId: string,
   phoneId: string,
   now = Date.now(),
-): { messages: Incoming[]; deliveries: Delivery[] } {
+): {
+  messages: Incoming[];
+  deliveries: Delivery[];
+  identityChanges: IdentityChange[];
+} {
   const messages: Incoming[] = [];
   const deliveries: Delivery[] = [];
+  const identityChanges: IdentityChange[] = [];
   const root = object(input);
   if (root.object !== "whatsapp_business_account")
-    return { messages, deliveries };
+    return { messages, deliveries, identityChanges };
 
   for (const rawEntry of array(root.entry)) {
     const entry = object(rawEntry);
@@ -118,12 +137,35 @@ export function extractEvents(
       for (const rawMessage of array(value.messages)) {
         const message = object(rawMessage);
         const id = string(message.id);
-        const sender = string(message.from);
+        if (message.type === "system") {
+          const system = object(message.system);
+          const previous = string(system.previous_user_id);
+          const next = string(system.user_id);
+          const phone = string(system.wa_id);
+          if (
+            (system.type === "user_changed_number" ||
+              system.type === "user_changed_user_id") &&
+            userIdPattern.test(previous) &&
+            userIdPattern.test(next) &&
+            previous !== next
+          ) {
+            identityChanges.push({
+              previous,
+              next,
+              phone: phonePattern.test(phone) ? phone : null,
+            });
+          }
+          continue;
+        }
+        const from = string(message.from);
+        const fromUser = string(message.from_user_id);
+        const sender = phonePattern.test(from) ? from : null;
+        const userId = userIdPattern.test(fromUser) ? fromUser : null;
         const seconds = string(message.timestamp);
         const milliseconds = Number(seconds) * 1000;
         if (
           !providerPattern.test(id) ||
-          !phonePattern.test(sender) ||
+          (!sender && !userId) ||
           !/^\d{1,12}$/.test(seconds) ||
           milliseconds <= 0 ||
           milliseconds > now + 5 * 60 * 1000
@@ -132,16 +174,21 @@ export function extractEvents(
         const type = string(message.type);
         const mediaKind = mediaKinds.find((kind) => kind === type);
         const media = mediaKind ? object(message[mediaKind]) : {};
-        const name = string(
-          object(contacts.find((contact) => contact.wa_id === sender)?.profile)
-            .name,
+        const profile = object(
+          contacts.find(
+            (contact) =>
+              (userId && contact.user_id === userId) ||
+              (sender && contact.wa_id === sender),
+          )?.profile,
         );
+        const name = string(profile.name) || string(profile.username);
         const text = string(object(message.text).body).trim();
         const caption = string(media.caption).trim();
         const mediaId = string(media.id);
         messages.push({
           id,
           sender,
+          userId,
           name,
           timestamp: new Date(Math.min(now, milliseconds)).toISOString(),
           kind: mediaKind ?? (type === "text" && text ? "text" : "unsupported"),
@@ -178,7 +225,7 @@ export function extractEvents(
     }
   }
 
-  return { messages, deliveries };
+  return { messages, deliveries, identityChanges };
 }
 
 function sanitizeFilename(value: string) {

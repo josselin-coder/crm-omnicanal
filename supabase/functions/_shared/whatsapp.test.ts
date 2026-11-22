@@ -5,6 +5,7 @@ import {
   isMetaMediaUrl,
   readLimited,
   verifySignature,
+  whatsappDestination,
 } from "./whatsapp";
 
 const now = Date.parse("2026-11-22T12:00:00Z");
@@ -99,6 +100,7 @@ describe("WhatsApp webhook input", () => {
       {
         id: "wamid.doc",
         sender: "5112345678",
+        userId: null,
         name: "Cliente",
         timestamp: new Date(now).toISOString(),
         kind: "document",
@@ -110,6 +112,42 @@ describe("WhatsApp webhook input", () => {
     expect(parsed.deliveries).toEqual([
       { id: "wamid.reply", requestId, status: "delivered" },
     ]);
+  });
+
+  it("handles users without phone numbers and identifies BSUID changes", () => {
+    const value = {
+      metadata: { phone_number_id: "567" },
+      contacts: [{ user_id: "PE.ABC123", profile: { username: "cliente" } }],
+      messages: [
+        {
+          id: "wamid.username",
+          from_user_id: "PE.ABC123",
+          timestamp: String(now / 1000),
+          type: "text",
+          text: { body: "Hola" },
+        },
+        {
+          type: "system",
+          system: {
+            type: "user_changed_user_id",
+            previous_user_id: "PE.Previous",
+            user_id: "PE.New",
+          },
+        },
+      ],
+    };
+    const parsed = extractEvents(event(value), "123", "567", now);
+    expect(parsed.messages).toHaveLength(1);
+    expect(parsed.messages[0]).toMatchObject({
+      sender: null,
+      userId: "PE.ABC123",
+      name: "cliente",
+    });
+    expect(parsed.identityChanges).toEqual([
+      { previous: "PE.Previous", next: "PE.New", phone: null },
+    ]);
+    expect(whatsappDestination("PE.ABC123")).toEqual({ recipient: "PE.ABC123" });
+    expect(whatsappDestination("5112345678")).toEqual({ to: "5112345678" });
   });
 
   it("limits streamed bodies and refuses media URLs outside Meta", async () => {
