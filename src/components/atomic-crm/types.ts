@@ -92,6 +92,7 @@ export type Contact = {
   email_jsonb: EmailAndType[];
   avatar?: Partial<RAFile>;
   linkedin_url?: string | null;
+  archived_at?: string | null;
   first_seen: string;
   last_seen: string;
   has_newsletter: boolean;

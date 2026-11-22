@@ -3,8 +3,13 @@ import {
   HttpError,
   withLifecycleCallbacks,
   type DataProvider,
+  type DeleteManyParams,
+  type DeleteManyResult,
+  type DeleteParams,
+  type DeleteResult,
   type GetListParams,
   type Identifier,
+  type RaRecord,
   type ResourceCallbacks,
 } from "ra-core";
 import type {
@@ -24,6 +29,7 @@ import { config } from "../../root/config";
 import { getIsInitialized } from "./authProvider";
 import { searchDealCategories } from "./searchDealCategories";
 import { getSupabaseClient } from "./supabase";
+import { setContactArchived } from "./setContactArchived";
 
 const getBaseDataProvider = () =>
   supabaseDataProvider({
@@ -59,7 +65,16 @@ const getDataProviderWithCustomMethods = () => {
         return baseDataProvider.getList("companies_summary", params);
       }
       if (resource === "contacts") {
-        return baseDataProvider.getList("contacts_summary", params);
+        const { archiveView, ...filter } = params.filter ?? {};
+        return baseDataProvider.getList("contacts_summary", {
+          ...params,
+          filter: {
+            ...filter,
+            [archiveView === "archived"
+              ? "archived_at@not.is"
+              : "archived_at@is"]: null,
+          },
+        });
       }
       if (resource === "activity_log") {
         const { data, total } = await baseDataProvider.getList(
@@ -90,6 +105,80 @@ const getDataProviderWithCustomMethods = () => {
       }
 
       return baseDataProvider.getOne(resource, params);
+    },
+
+    async delete<RecordType extends RaRecord>(
+      resource: string,
+      params: DeleteParams<RecordType>,
+    ): Promise<DeleteResult<RecordType>> {
+      if (resource === "deals") {
+        const { data, error } = await getSupabaseClient()
+          .from("deals")
+          .update({ archived_at: new Date().toISOString() })
+          .eq("id", params.id)
+          .select()
+          .returns<RecordType[]>()
+          .single();
+        if (error) throw new HttpError("Cannot archive deal", 403, error);
+        return { data };
+      }
+      if (
+        resource !== "contacts" &&
+        resource !== "contact_notes" &&
+        resource !== "deal_notes"
+      ) {
+        return baseDataProvider.delete<RecordType>(resource, params);
+      }
+
+      const record =
+        params.previousData ??
+        (
+          await baseDataProvider.getOne<RecordType>(resource, {
+            id: params.id,
+            meta: params.meta,
+          })
+        ).data;
+      if (resource === "contacts") {
+        await setContactArchived(params.id, true);
+      } else {
+        const { data, error } = await getSupabaseClient().rpc(
+          "archive_crm_note",
+          {
+            target_id: params.id,
+            note_resource: resource,
+          },
+        );
+        if (error || !data)
+          throw new HttpError("Cannot archive note", 403, error);
+      }
+
+      return { data: record };
+    },
+    async deleteMany<RecordType extends RaRecord>(
+      resource: string,
+      params: DeleteManyParams<RecordType>,
+    ): Promise<DeleteManyResult<RecordType>> {
+      if (resource === "contacts") {
+        const { error } = await getSupabaseClient().rpc("archive_contacts", {
+          target_ids: params.ids,
+        });
+        if (error)
+          throw new HttpError("Cannot archive selected contacts", 403, error);
+        return { data: params.ids };
+      }
+      if (resource === "deals") {
+        if (!params.ids.length) return { data: [] };
+        const { data, error } = await getSupabaseClient()
+          .from("deals")
+          .update({ archived_at: new Date().toISOString() })
+          .in("id", params.ids)
+          .select("id")
+          .returns<Pick<RecordType, "id">[]>();
+        if (error)
+          throw new HttpError("Cannot archive selected deals", 403, error);
+        return { data: data.map(({ id }) => id) };
+      }
+      return baseDataProvider.deleteMany<RecordType>(resource, params);
     },
 
     async signUp({ email, password, first_name, last_name }: SignUpData) {

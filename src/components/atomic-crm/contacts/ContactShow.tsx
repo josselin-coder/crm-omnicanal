@@ -31,6 +31,7 @@ import { ContactTasksList } from "./ContactTasksList";
 import type { Contact } from "../types";
 import { Avatar } from "./Avatar";
 import { ContactAside } from "./ContactAside";
+import { ContactArchiveButton } from "./ContactArchiveButton";
 import { useTrackRecentContact } from "./useRecentContacts";
 import { MobileBackButton } from "../misc/MobileBackButton";
 
@@ -124,6 +125,7 @@ const ContactShowContentMobile = () => {
         </Button>
       </MobileHeader>
       <MobileContent>
+        <ContactArchiveButton contact={record} />
         <div className="mb-6">
           <div className="flex items-center mb-4">
             <Avatar />

@@ -1,6 +1,6 @@
 import { useRecordContext, useTranslate } from "ra-core";
 import { EditButton } from "@/components/admin/edit-button";
-import { DeleteButton } from "@/components/admin";
+import { ContactArchiveButton } from "./ContactArchiveButton";
 import { ReferenceManyField } from "@/components/admin/reference-many-field";
 import { ShowButton } from "@/components/admin/show-button";
 
@@ -74,10 +74,7 @@ export const ContactAside = ({ link = "edit" }: { link?: "edit" | "show" }) => {
             <ContactMergeButton />
           </div>
           <div className="mt-6 pt-6 border-t hidden sm:flex flex-col gap-2 items-start">
-            <DeleteButton
-              className="h-6 cursor-pointer hover:bg-destructive/10! text-destructive! border-destructive! focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40"
-              size="sm"
-            />
+            <ContactArchiveButton contact={record} />
           </div>
         </>
       )}
