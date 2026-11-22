@@ -8,6 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   Home,
+  Inbox,
   ListTodo,
   Plus,
   Settings,
@@ -29,6 +30,8 @@ export const MobileNavigation = () => {
   let currentPath: string | boolean = "/";
   if (matchPath("/", location.pathname)) {
     currentPath = "/";
+  } else if (matchPath("/inbox", location.pathname)) {
+    currentPath = "/inbox";
   } else if (matchPath("/contacts/*", location.pathname)) {
     currentPath = "/contacts";
   } else if (matchPath("/companies/*", location.pathname)) {
@@ -75,6 +78,12 @@ export const MobileNavigation = () => {
               smart_count: 2,
             })}
             isActive={currentPath === "/contacts"}
+          />
+          <NavigationButton
+            href="/inbox"
+            Icon={Inbox}
+            label="Bandeja"
+            isActive={currentPath === "/inbox"}
           />
           <CreateButton />
           <NavigationButton
