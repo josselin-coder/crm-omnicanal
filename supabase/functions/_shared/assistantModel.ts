@@ -55,23 +55,24 @@ export async function extractWithModel(
   const model = Deno.env.get("OPENAI_ASSISTANT_MODEL");
   if (!apiKey || !model) return undefined;
 
-  const input = turns.map(({ role, text, attachment, attachments = [] }, index) => ({
-    index,
-    role,
-    text: text
-      .replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g, "[correo]")
-      .replace(
-        /(?<![\p{L}\d])\+?\d(?:[ -]?\d){7,}(?![\p{L}\d])/gu,
-        "[teléfono]",
+  const input = turns.map(
+    ({ role, text, attachment, attachments = [] }, index) => ({
+      index,
+      role,
+      text: text
+        .replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g, "[correo]")
+        .replace(
+          /(?<![\p{L}\d])\+?\d(?:[ -]?\d){7,}(?![\p{L}\d])/gu,
+          "[teléfono]",
+        ),
+      attachments: [...(attachment ? [attachment] : []), ...attachments].map(
+        (item) => ({
+          kind: item.kind,
+          extension: item.name.match(/\.[a-z0-9]{1,8}$/i)?.[0] ?? null,
+        }),
       ),
-    attachments: [
-      ...(attachment ? [attachment] : []),
-      ...attachments,
-    ].map((item) => ({
-      kind: item.kind,
-      extension: item.name.match(/\.[a-z0-9]{1,8}$/i)?.[0] ?? null,
-    })),
-  }));
+    }),
+  );
 
   try {
     const response = await fetch("https://api.openai.com/v1/responses", {

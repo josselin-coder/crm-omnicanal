@@ -21,10 +21,15 @@ export function MetaAttachment({ attachment }: { attachment: Attachment }) {
   async function open(preview: boolean) {
     setLoading(true);
     try {
-      const { data, error } = await getSupabaseClient().functions.invoke<{ path: string }>("meta-inbox", {
+      const { data, error } = await getSupabaseClient().functions.invoke<{
+        path: string;
+      }>("meta-inbox", {
         body: { action: "attachment", attachmentId: attachment.id, preview },
       });
-      if (error || !data?.path?.startsWith("/storage/v1/object/sign/meta-messaging-media/")) {
+      if (
+        error ||
+        !data?.path?.startsWith("/storage/v1/object/sign/meta-messaging-media/")
+      ) {
         throw new Error("Attachment is unavailable");
       }
       const url = new URL(data.path, config.supabaseUrl).href;
@@ -46,21 +51,41 @@ export function MetaAttachment({ attachment }: { attachment: Attachment }) {
   return (
     <div className="mt-2 space-y-2">
       <p className="break-words text-sm">{attachment.name}</p>
-      {attachment.state === "pending" && <p className="text-xs text-muted-foreground">Descarga pendiente</p>}
-      {attachment.state === "unavailable" && <p className="text-xs text-muted-foreground">Adjunto no disponible</p>}
+      {attachment.state === "pending" && (
+        <p className="text-xs text-muted-foreground">Descarga pendiente</p>
+      )}
+      {attachment.state === "unavailable" && (
+        <p className="text-xs text-muted-foreground">Adjunto no disponible</p>
+      )}
       {attachment.state === "ready" && (
         <div className="flex flex-wrap gap-2">
           {canPreview && (
-            <Button size="sm" variant="outline" disabled={loading} onClick={() => void open(true)}>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={loading}
+              onClick={() => void open(true)}
+            >
               Ver imagen
             </Button>
           )}
-          <Button size="sm" variant="outline" disabled={loading} onClick={() => void open(false)}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={loading}
+            onClick={() => void open(false)}
+          >
             Descargar
           </Button>
         </div>
       )}
-      {image && <img src={image} alt={attachment.name} className="max-h-64 max-w-full rounded-md" />}
+      {image && (
+        <img
+          src={image}
+          alt={attachment.name}
+          className="max-h-64 max-w-full rounded-md"
+        />
+      )}
     </div>
   );
 }

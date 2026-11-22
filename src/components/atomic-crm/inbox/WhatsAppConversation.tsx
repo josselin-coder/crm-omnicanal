@@ -31,7 +31,12 @@ export function ChannelComposer({
   conversationId: string;
   channel: "whatsapp" | "instagram" | "messenger";
 }) {
-  const label = channel === "whatsapp" ? "WhatsApp" : channel === "instagram" ? "Instagram Direct" : "Messenger";
+  const label =
+    channel === "whatsapp"
+      ? "WhatsApp"
+      : channel === "instagram"
+        ? "Instagram Direct"
+        : "Messenger";
   const endpoint = channel === "whatsapp" ? "whatsapp-inbox" : "meta-inbox";
   const [draft, setDraft] = useState("");
   const [attempt, setAttempt] = useState<SendAttempt>();
@@ -51,12 +56,9 @@ export function ChannelComposer({
     setSending(true);
     try {
       const { data, error } =
-        await getSupabaseClient().functions.invoke<SendResult>(
-          endpoint,
-          {
-            body: { action: "send", channel, conversationId, ...pending },
-          },
-        );
+        await getSupabaseClient().functions.invoke<SendResult>(endpoint, {
+          body: { action: "send", channel, conversationId, ...pending },
+        });
       if (error || !data) {
         const context = error?.context;
         const result =

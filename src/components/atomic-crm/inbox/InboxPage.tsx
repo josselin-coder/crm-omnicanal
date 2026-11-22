@@ -341,7 +341,9 @@ function ConversationDetail({
     queryFn: async () => {
       const { data, error } = await client
         .from("inbox_messages")
-        .select("id, direction, body, sent_at, attachment_name, send_status, meta_message_attachments(id, position, name, mime, kind, state)")
+        .select(
+          "id, direction, body, sent_at, attachment_name, send_status, meta_message_attachments(id, position, name, mime, kind, state)",
+        )
         .eq("conversation_id", conversation.id)
         .order("sent_at", { ascending: false })
         .order("id", { ascending: false })
@@ -406,9 +408,7 @@ function ConversationDetail({
           <CardTitle>{contactName(conversation)}</CardTitle>
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary">{channels[conversation.channel]}</Badge>
-            {!liveChannel && (
-              <Badge variant="outline">Demostración</Badge>
-            )}
+            {!liveChannel && <Badge variant="outline">Demostración</Badge>}
             {customer.contact.archived_at && (
               <Badge variant="outline">Archivado</Badge>
             )}
@@ -558,7 +558,12 @@ function ConversationDetail({
                 {message.meta_message_attachments
                   .slice()
                   .sort((a, b) => a.position - b.position)
-                  .map((attachment) => <MetaAttachment key={attachment.id} attachment={attachment} />)}
+                  .map((attachment) => (
+                    <MetaAttachment
+                      key={attachment.id}
+                      attachment={attachment}
+                    />
+                  ))}
                 {message.send_status && (
                   <p className="text-xs text-muted-foreground">
                     {deliveryLabels[message.send_status]}
@@ -575,7 +580,10 @@ function ConversationDetail({
           {liveChannel &&
             canReply &&
             (windowOpen ? (
-              <ChannelComposer conversationId={conversation.id} channel={conversation.channel} />
+              <ChannelComposer
+                conversationId={conversation.id}
+                channel={conversation.channel}
+              />
             ) : (
               <p className="text-sm text-muted-foreground">
                 La ventana de 24 horas está cerrada. El cliente debe enviar un
