@@ -42,6 +42,7 @@ export type Reason =
   | "price_request"
   | "human_request"
   | "purchase_intent"
+  | "brief_complete"
   | "history_limit"
   | "human_control"
   | "declined";
@@ -54,6 +55,7 @@ export type Extraction = {
   intent: Intent;
   humanRequested: boolean;
   priceRequested: boolean;
+  decisionTurn: number | null;
 };
 export type Decision = {
   action: Action;
@@ -183,6 +185,42 @@ export function proposalFor(action: unknown): string | null {
     : null;
 }
 
+type Signal = "declined" | "undecided" | "human_request" | "price_request" | "purchase_intent";
+
+const declinePattern =
+  /\b(?:ya no me interesa|no me interesa|cancela(?:r)? (?:mi solicitud|el pedido)|no (?:deseo|quiero|voy a) (?:continuar|seguir|comprar|encargar|contratar)|(?:ya )?no (?:lo|la) necesito|desisto|declino|mejor (?:ya )?no|deja(?:mos)?lo ahi)\b/;
+const undecidedPattern =
+  /\b(?:no estoy segur[oa]|estoy evaluando|aun no decido|estoy comparando|lo voy a pensar)\b/;
+const resumePattern = /\b(?:sigamos|quiero continuar|retomemos|si me interesa)\b/;
+
+function explicitSignal(text: string): Signal | undefined {
+  for (const clause of text
+    .split(/[.!?;]+|\b(?:pero|aunque|sin embargo)\b/)
+    .reverse()) {
+    if (declinePattern.test(clause)) return "declined";
+    if (undecidedPattern.test(clause)) return "undecided";
+    if (humanPattern.test(clause)) return "human_request";
+    if (pricePattern.test(clause)) return "price_request";
+    if (purchasePattern.test(clause) || resumePattern.test(clause))
+      return "purchase_intent";
+  }
+}
+
+function latestSignal(turns: Turn[], model?: Extraction): Signal | undefined {
+  const modelSignal = model?.intent === "descartado" ? "declined"
+    : model?.intent === "indeciso" ? "undecided"
+    : model?.humanRequested ? "human_request"
+    : model?.priceRequested ? "price_request"
+    : model?.intent === "listo_para_ventas" ? "purchase_intent" : undefined;
+  for (let index = turns.length - 1; index >= 0; index--) {
+    const turn = turns[index];
+    if (turn.role !== "customer") continue;
+    const signal = explicitSignal(normalize(turn.text));
+    if (signal) return signal;
+    if (modelSignal && model?.decisionTurn === index) return modelSignal;
+  }
+}
+
 export function decide(
   turns: Turn[],
   now: Date,
@@ -191,6 +229,7 @@ export function decide(
     engine?: Engine;
     stopped?: boolean;
     overflow?: boolean;
+    afterHandoff?: boolean;
   } = {},
 ): Decision {
   let name: string | null = null;
@@ -260,37 +299,15 @@ export function decide(
 
   if (options.stopped) return result("stopped", "nuevo", "human_control");
   if (options.overflow) return result("handoff", "indeciso", "history_limit");
-  if (humanPattern.test(customerText) || model?.humanRequested)
-    return result("handoff", "listo_para_ventas", "human_request");
-  if (pricePattern.test(customerText) || model?.priceRequested)
-    return result("handoff", "listo_para_ventas", "price_request");
-  if (
-    purchasePattern.test(customerText) ||
-    model?.intent === "listo_para_ventas"
-  )
-    return result("handoff", "listo_para_ventas", "purchase_intent");
-
-  const lastCustomerText = normalize(customer.at(-1)?.text ?? "");
-  if (
-    model?.intent === "descartado" ||
-    /\b(?:ya no me interesa|cancela mi solicitud|no deseo continuar|ya no lo necesito)\b/.test(
-      lastCustomerText,
-    )
-  )
-    return result("stopped", "descartado", "declined");
+  const signal = latestSignal(turns, model);
+  if (signal === "declined") return result("stopped", "descartado", "declined");
+  if (signal === "undecided") return result("stopped", "indeciso", "waiting");
+  if (signal) return result("handoff", "listo_para_ventas", signal);
 
   const classification =
-    model?.intent === "indeciso" ||
-    /\b(?:no estoy segur[oa]|estoy evaluando|aun no decido|estoy comparando)\b/.test(
-      lastCustomerText,
-    )
-      ? "indeciso"
-      : service || files.length > 0 || model?.intent === "interesado"
-        ? "interesado"
-        : "nuevo";
-
-  if (!name) return result(greeting(now), classification, "next_question");
-  if (!service) return result("ask_service", classification, "next_question");
+    service || files.length > 0 || model?.intent === "interesado"
+      ? "interesado"
+      : "nuevo";
 
   const reference = attachments.some(
     ({ name, kind }) =>
@@ -298,14 +315,21 @@ export function decide(
   );
   const technicalFile = attachments.some(({ name, kind }) => {
     if (service === "impresion_3d") return /\.(?:stl|obj|step)$/i.test(name);
+    if (!service) return false;
     if (service === "cnc")
       return (
         kind === "document" && !/\.(?:png|jpe?g|webp|gif|heic)$/i.test(name)
       );
     return /\.dxf$/i.test(name);
   });
-  if (!technicalFile) {
-    if (noDesign && !reference)
+  if (service && quantity !== null && (technicalFile || reference))
+    return result("handoff", "listo_para_ventas", "brief_complete");
+  if (options.afterHandoff) return result("stopped", classification, "waiting");
+  if (!name) return result(greeting(now), classification, "next_question");
+  if (!service) return result("ask_service", classification, "next_question");
+
+  if (!technicalFile && !reference) {
+    if (noDesign)
       return result("ask_reference", classification, "next_question");
     if (!noDesign) {
       const action =

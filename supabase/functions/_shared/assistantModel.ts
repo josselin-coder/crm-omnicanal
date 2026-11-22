@@ -15,6 +15,7 @@ const properties = {
   intent: { type: "string", enum: intentValues },
   humanRequested: { type: "boolean" },
   priceRequested: { type: "boolean" },
+  decisionTurn: nullable("integer"),
 };
 
 export function validateExtraction(value: unknown): Extraction | undefined {
@@ -35,7 +36,8 @@ export function validateExtraction(value: unknown): Extraction | undefined {
     typeof x.noDesign !== "boolean" ||
     !intentValues.some((intent) => intent === x.intent) ||
     typeof x.humanRequested !== "boolean" ||
-    typeof x.priceRequested !== "boolean"
+    typeof x.priceRequested !== "boolean" ||
+    !(x.decisionTurn === null || (typeof x.decisionTurn === "number" && Number.isInteger(x.decisionTurn) && x.decisionTurn >= 0))
   )
     return undefined;
   return x as Extraction;
@@ -48,7 +50,8 @@ export async function extractWithModel(
   const model = Deno.env.get("OPENAI_ASSISTANT_MODEL");
   if (!apiKey || !model) return undefined;
 
-  const input = turns.map(({ role, text, attachment }) => ({
+  const input = turns.map(({ role, text, attachment }, index) => ({
+    index,
     role,
     text: text
       .replace(/\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b/g, "[correo]")
@@ -83,7 +86,8 @@ export async function extractWithModel(
           "quantity es la cantidad de piezas, nunca un monto, medida, teléfono o fecha. Usa null si hay ambigüedad.",
           "Usa el servicio y la cantidad más recientes que estén respaldados por el texto.",
           "Indica listo_para_ventas si hay un pedido, intención firme de compra o disposición para pagar; no confirmes ventas.",
-          "Detecta toda solicitud de precio, cotización o atención humana, incluso si aparece en mensajes anteriores.",
+          "Prioriza la última decisión del cliente sobre aceptar, rechazar, esperar, pedir precio o atención humana. Indica su índice de turno en decisionTurn o null si no existe.",
+          "humanRequested y priceRequested corresponden exclusivamente al turno indicado. No arrastres solicitudes anteriores si el cliente cambió de decisión.",
           "Usa descartado solo si el cliente declina claramente seguir.",
         ].join(" "),
         input: JSON.stringify(input),

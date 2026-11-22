@@ -199,7 +199,7 @@ async function receive(req: Request) {
         const { data, error } = await supabaseAdmin
           .from("assistant_states")
           .select("conversation_id")
-          .eq("mode", "observe")
+          .in("mode", ["observe", "handoff"])
           .in("conversation_id", [...touched]);
         if (error) throw error;
         for (const row of data) {

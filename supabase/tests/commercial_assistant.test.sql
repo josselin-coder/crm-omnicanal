@@ -1,7 +1,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
-select plan(22);
+select plan(30);
 
 insert into public.user_invitations (user_id) values
     ('93000000-0000-4000-8000-000000000001'),
@@ -40,11 +40,40 @@ select is(finish_assistant_observation((select id from assistant_fixture),
     '{"action":"handoff","classification":"listo_para_ventas","reason":"price_request","engine":"rules","facts":{"quantity":20}}'),
     true, 'Price intent records an internal handoff');
 select is((select mode from assistant_states where conversation_id = (select id from assistant_fixture)), 'handoff',
-    'Handoff pauses observation');
+    'Handoff disables suggestions while preserving internal classification');
 select is((select classification from inbox_customers where contact_id = (select contact_id from assistant_fixture)),
     'listo_para_ventas', 'Classification is visible in the inbox');
 select is((select count(*) from inbox_messages where conversation_id = (select id from assistant_fixture) and direction = 'outgoing'),
     0::bigint, 'Observation does not create a WhatsApp reply');
+select ok((select requires_attention from assistant_decisions
+    where conversation_id = (select id from assistant_fixture) and reason = 'price_request'),
+    'The original handoff notifies the seller');
+select receive_whatsapp_message('930','9312345678','Simulación','wamid.assistant.third',now(),
+    'Adjunto el archivo','document','fixture/design.dxf','diseño.dxf','application/octet-stream');
+update assistant_claim set job = claim_assistant_observation((select id from assistant_fixture));
+select is((select job->>'mode' from assistant_claim), 'handoff', 'Follow-up claims know they are in classification-only mode');
+select ok(finish_assistant_observation((select id from assistant_fixture),
+    (select (job->>'token')::uuid from assistant_claim), (select (job->>'revision')::bigint from assistant_claim),
+    '{"action":"handoff","classification":"listo_para_ventas","reason":"brief_complete","engine":"rules","facts":{}}'),
+    'Complete brief is recorded during handoff');
+select is((select requires_attention from assistant_decisions
+    where conversation_id = (select id from assistant_fixture) and reason = 'brief_complete'), false,
+    'Repeated readiness does not notify again');
+
+select receive_whatsapp_message('930','9312345678','Simulación','wamid.assistant.rejected',now(),
+    'Ya no me interesa el servicio','text',null,null,null);
+update assistant_claim set job = claim_assistant_observation((select id from assistant_fixture));
+select is((select job->'transcript'->-1->>'text' from assistant_claim), 'Ya no me interesa el servicio',
+    'Same-timestamp messages are analyzed in arrival order');
+select ok(finish_assistant_observation((select id from assistant_fixture),
+    (select (job->>'token')::uuid from assistant_claim), (select (job->>'revision')::bigint from assistant_claim),
+    '{"action":"stopped","classification":"descartado","reason":"declined","engine":"rules","facts":{}}'),
+    'Rejection is recorded after the handoff');
+select is((select classification from inbox_customers where contact_id = (select contact_id from assistant_fixture)),
+    'descartado', 'The latest rejection replaces the previous readiness');
+select is((select count(*) from inbox_messages where conversation_id = (select id from assistant_fixture) and direction = 'outgoing'),
+    0::bigint, 'Follow-up classification sends no reply');
+
 select is(control_inbox_assistant('93000000-0000-4000-8000-000000000001',
     (select id from assistant_fixture),'take_control'), 'human', 'Seller can take control');
 select is(control_inbox_assistant('93000000-0000-4000-8000-000000000001',

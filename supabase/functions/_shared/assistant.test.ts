@@ -69,7 +69,7 @@ describe("Commercial assistant", () => {
       quantity: 5,
       files: ["guía.png"],
     });
-    expect(result.action).toBe("acknowledge");
+    expect(result.action).toBe("handoff");
   });
 
   it("asks for a reference when the customer declines to provide the file", () => {
@@ -94,7 +94,7 @@ describe("Commercial assistant", () => {
       ...customer("Adjunto el diseño"),
       attachment: { name: "plano.DXF", kind: "document" },
     });
-    expect(decide(transcript, when).action).toBe("acknowledge");
+    expect(decide(transcript, when).action).toBe("handoff");
     expect(decide(transcript, when).facts.quantity).toBe(20);
   });
 
@@ -116,6 +116,69 @@ describe("Commercial assistant", () => {
     expect(proposalFor(decision.action)).toBeNull();
   });
 
+  it("accepts a spontaneous image and asks only for the missing quantity", () => {
+    const transcript: Turn[] = [
+      customer("Soy Luz. Necesito grabar madera."),
+      { ...customer("Esta es mi referencia"), attachment: { name: "referencia.jpg", kind: "image" } },
+    ];
+    expect(decide(transcript, when).action).toBe("ask_quantity");
+    transcript.push(suggested("¿Cuántas unidades necesitas?"), customer("20"));
+    const decision = decide(transcript, when);
+    expect(decision).toMatchObject({
+      action: "handoff",
+      classification: "listo_para_ventas",
+      reason: "brief_complete",
+      facts: { quantity: 20, files: ["referencia.jpg"] },
+    });
+    expect(proposalFor(decision.action)).toBeNull();
+  });
+
+  it("hands off a complete brief even when the customer did not give a name", () => {
+    const decision = decide([
+      customer("Necesito grabado de 12 placas."),
+      { ...customer("Adjunto el diseño"), attachment: { name: "placa.dxf", kind: "document" } },
+    ], when);
+    expect(decision.reason).toBe("brief_complete");
+    expect(decision.classification).toBe("listo_para_ventas");
+  });
+
+  it("uses the latest rejection instead of previous requests for price or purchase", () => {
+    const transcript = [
+      customer("¿Me cotizas un grabado?"),
+      customer("Quiero comprar 10 placas, ¿puedo hablar con un asesor?"),
+      customer("Ya no me interesa, cancela mi solicitud."),
+      customer("Gracias."),
+    ];
+    const decision = decide(transcript, when, {
+      afterHandoff: true,
+      model: {
+        name: null, service: "grabado", quantity: 10, noDesign: false,
+        intent: "listo_para_ventas", humanRequested: true, priceRequested: false,
+        decisionTurn: 1,
+      },
+    });
+    expect(decision.classification).toBe("descartado");
+    expect(decision.reason).toBe("declined");
+    expect(proposalFor(decision.action)).toBeNull();
+    transcript.push(customer("Cambié de opinión. Quiero encargar el pedido."));
+    expect(decide(transcript, when, { afterHandoff: true }).classification).toBe("listo_para_ventas");
+  });
+
+  it("uses a newer model interpretation only when it points to a customer turn", () => {
+    const transcript = [
+      customer("¿Cuánto cuesta?"),
+      customer("Prefiero dejar esto aquí."),
+      suggested("Anotado."),
+    ];
+    const model = {
+      name: null, service: null, quantity: null, noDesign: false,
+      intent: "descartado" as const, humanRequested: false, priceRequested: false,
+      decisionTurn: 1,
+    };
+    expect(decide(transcript, when, { model }).classification).toBe("descartado");
+    expect(decide(transcript, when, { model: { ...model, decisionTurn: 2 } }).reason).toBe("price_request");
+  });
+
   it("stops when a seller takes control, even for a price request", () => {
     const decision = decide([customer("¿Qué precio tiene?")], when, {
       stopped: true,
@@ -133,6 +196,7 @@ describe("Commercial assistant", () => {
       intent: "interesado",
       humanRequested: false,
       priceRequested: false,
+      decisionTurn: null,
     };
     expect(validateExtraction(extraction)).toEqual(extraction);
     expect(

@@ -49,6 +49,7 @@ const reasons: Record<string, string> = {
   price_request: "Pidió precio o cotización",
   human_request: "Pidió atención humana",
   purchase_intent: "Intención de compra",
+  brief_complete: "Servicio, diseño de referencia y cantidad confirmados",
   history_limit: "Historial extenso, requiere revisión humana",
   human_control: "Control humano",
   declined: "El cliente decidió no continuar",
@@ -161,7 +162,9 @@ export function AssistantObservation({
         )}
         {mode === "handoff" && (
           <p className="text-sm">
-            La conversación requiere revisión de un asesor.
+            {latest?.classification === "descartado"
+              ? "El cliente declinó. La clasificación se actualizó."
+              : "El asesor mantiene la conversación. Los cambios de intención quedan registrados."}
           </p>
         )}
         {canControl && mode && mode !== "human" && (
@@ -175,7 +178,7 @@ export function AssistantObservation({
                 Iniciar observación
               </Button>
             )}
-            {mode === "observe" && (
+            {(mode === "observe" || mode === "handoff") && (
               <>
                 <Button
                   variant="outline"
@@ -232,6 +235,7 @@ export function AssistantSimulator() {
   const [simulationTime, setSimulationTime] = useState("");
   const [useModel, setUseModel] = useState(false);
   const [controlled, setControlled] = useState(false);
+  const [handedOff, setHandedOff] = useState(false);
   const [decision, setDecision] = useState<Decision>();
   const notify = useNotify();
   const mutation = useMutation({
@@ -246,15 +250,13 @@ export function AssistantSimulator() {
         action: "simulate",
         transcript,
         stopped,
+        afterHandoff: handedOff,
         useModel,
         time: simulationTime ? simulationTime + "-05:00" : undefined,
       }),
     onError: () => notify("No se pudo simular este turno.", { type: "error" }),
   });
-  const paused =
-    controlled ||
-    decision?.action === "handoff" ||
-    decision?.action === "stopped";
+  const paused = controlled;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -281,6 +283,7 @@ export function AssistantSimulator() {
         stopped: false,
       });
       setDecision(response.decision);
+      if (response.decision.action === "handoff") setHandedOff(true);
       setTurns(
         response.proposal
           ? [...next, { role: "assistant", text: response.proposal }]
@@ -352,6 +355,9 @@ export function AssistantSimulator() {
         </ol>
         {decision && <Summary decision={decision} />}
         {paused && <p role="status">Simulación pausada.</p>}
+        {handedOff && !paused && (
+          <p role="status">Derivado. Puedes simular un cambio de intención.</p>
+        )}
         <form className="grid gap-2" onSubmit={(event) => void submit(event)}>
           <label className="grid gap-1 text-sm">
             Mensaje del cliente
@@ -402,6 +408,7 @@ export function AssistantSimulator() {
                 setTurns([]);
                 setDecision(undefined);
                 setControlled(false);
+                setHandedOff(false);
                 setDraft("");
                 setAttachment("");
               }}

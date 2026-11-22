@@ -36,16 +36,18 @@ export async function analyze(
   now: Date,
   useModel: boolean,
   stopped = false,
+  afterHandoff = false,
 ): Promise<Decision> {
   if (stopped) return decide(transcript ?? [], now, { stopped: true });
   if (!transcript) return decide([], now, { overflow: true });
-  if (!useModel) return decide(transcript, now);
+  if (!useModel) return decide(transcript, now, { afterHandoff });
 
   const saidSomething = transcript.some((turn) => turn.role === "customer");
   const model = saidSomething ? await extractWithModel(transcript) : undefined;
   return decide(transcript, now, {
     model,
     engine: model ? "model" : "rules_fallback",
+    afterHandoff,
   });
 }
 
@@ -64,6 +66,8 @@ export async function observeConversation(conversationId: string) {
     parseTranscript(claim.transcript),
     new Date(),
     true,
+    false,
+    claim.mode === "handoff",
   );
   const { data: saved, error: saveError } = await supabaseAdmin.rpc(
     "finish_assistant_observation",

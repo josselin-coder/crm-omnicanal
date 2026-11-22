@@ -1,3 +1,7 @@
+-- Break ties between messages with the same provider timestamp by arrival order.
+alter table public.inbox_messages
+    add column assistant_arrival bigint generated always as identity;
+
 create table public.assistant_states (
     conversation_id uuid primary key references public.inbox_conversations(id) on delete restrict,
     mode text not null check (mode in ('observe', 'handoff', 'human', 'off')),
@@ -25,9 +29,10 @@ create table public.assistant_decisions (
     )),
     reason text not null check (reason in (
         'next_question', 'waiting', 'price_request', 'human_request',
-        'purchase_intent', 'history_limit', 'human_control', 'declined'
+        'purchase_intent', 'brief_complete', 'history_limit', 'human_control', 'declined'
     )),
     engine text not null check (engine in ('rules', 'model', 'rules_fallback')),
+    requires_attention boolean not null default false,
     facts jsonb not null check (jsonb_typeof(facts) = 'object'),
     created_at timestamptz not null default now(),
     constraint assistant_decision_scope check (
@@ -88,7 +93,7 @@ begin
             return 'archived';
         end if;
         next_mode := 'observe';
-    elsif command = 'disable' and current_mode = 'observe' then
+    elsif command = 'disable' and current_mode in ('observe', 'handoff') then
         next_mode := 'off';
     else
         return current_mode;
@@ -110,7 +115,7 @@ begin
     if new.direction = 'incoming' and new.provider_message_id is not null then
         perform 1 from public.inbox_conversations where id = new.conversation_id for update;
         update public.assistant_states set revision = revision + 1, claim = null
-        where conversation_id = new.conversation_id and mode = 'observe';
+        where conversation_id = new.conversation_id and mode in ('observe', 'handoff');
     elsif new.direction = 'outgoing' and new.send_status = 'pending' and new.sent_by is not null then
         perform 1 from public.inbox_conversations where id = new.conversation_id for update;
         insert into public.assistant_states (conversation_id, mode, controlled_by)
@@ -138,7 +143,7 @@ declare
     transcript jsonb;
 begin
     select * into state from public.assistant_states where conversation_id = target for update;
-    if state.mode is distinct from 'observe' or state.resolved_revision = state.revision
+    if (state.mode is null or state.mode not in ('observe', 'handoff')) or state.resolved_revision = state.revision
       or (state.claim is not null and state.claimed_at > now() - interval '45 seconds')
       or not exists (
         select 1 from public.inbox_conversations as conversation
@@ -161,13 +166,13 @@ begin
             'text', body,
             'attachment', case when attachment_path is not null then
                 jsonb_build_object('name', attachment_name, 'kind', message_kind) end
-        ) order by sent_at, id) into transcript
+        ) order by sent_at, assistant_arrival) into transcript
         from public.inbox_messages where conversation_id = target;
     end if;
 
     token := gen_random_uuid();
     update public.assistant_states set claim = token, claimed_at = now() where conversation_id = target;
-    return jsonb_build_object('token', token, 'revision', state.revision, 'transcript', transcript);
+    return jsonb_build_object('token', token, 'revision', state.revision, 'mode', state.mode, 'transcript', transcript);
 end;
 $$;
 
@@ -179,10 +184,11 @@ declare
     state public.assistant_states%rowtype;
     conversation public.inbox_conversations%rowtype;
     next_seller bigint;
+    needs_attention boolean;
 begin
     select * into conversation from public.inbox_conversations where id = target for update;
     select * into state from public.assistant_states where conversation_id = target for update;
-    if state.mode is distinct from 'observe' or state.claim is distinct from token
+    if (state.mode is null or state.mode not in ('observe', 'handoff')) or state.claim is distinct from token
         or state.revision is distinct from expected_revision
         or state.resolved_revision = expected_revision
         or not exists (
@@ -191,15 +197,22 @@ begin
         return false;
     end if;
 
+    needs_attention := decision->>'action' = 'handoff' and (
+        state.mode = 'observe' or not exists (
+            select 1 from public.assistant_decisions as previous
+            where previous.conversation_id = target and previous.revision = state.resolved_revision
+              and previous.action = 'handoff'
+        )
+    );
     insert into public.assistant_decisions
-        (conversation_id, revision, mode, action, classification, reason, engine, facts)
+        (conversation_id, revision, mode, action, classification, reason, engine, requires_attention, facts)
     values (target, expected_revision, 'observe', decision->>'action', decision->>'classification',
-        decision->>'reason', decision->>'engine', decision->'facts');
+        decision->>'reason', decision->>'engine', needs_attention, decision->'facts');
 
     update public.inbox_customers set classification = decision->>'classification'
     where contact_id = conversation.contact_id and classification <> 'comprado';
 
-    if decision->>'action' = 'handoff' and not exists (
+    if needs_attention and not exists (
         select 1 from public.sales where id = conversation.assigned_sales_id and not disabled
     ) then
         select sales.id into next_seller
@@ -219,7 +232,7 @@ begin
 
     update public.assistant_states
     set resolved_revision = expected_revision, claim = null,
-        mode = case when decision->>'action' = 'handoff' then 'handoff' else 'observe' end,
+        mode = case when decision->>'action' = 'handoff' then 'handoff' else state.mode end,
         updated_at = now()
     where conversation_id = target;
     return true;
