@@ -55,7 +55,7 @@ export async function extractWithModel(
   const model = Deno.env.get("OPENAI_ASSISTANT_MODEL");
   if (!apiKey || !model) return undefined;
 
-  const input = turns.map(({ role, text, attachment }, index) => ({
+  const input = turns.map(({ role, text, attachment, attachments = [] }, index) => ({
     index,
     role,
     text: text
@@ -64,12 +64,13 @@ export async function extractWithModel(
         /(?<![\p{L}\d])\+?\d(?:[ -]?\d){7,}(?![\p{L}\d])/gu,
         "[teléfono]",
       ),
-    attachment: attachment
-      ? {
-          kind: attachment.kind,
-          extension: attachment.name.match(/\.[a-z0-9]{1,8}$/i)?.[0] ?? null,
-        }
-      : null,
+    attachments: [
+      ...(attachment ? [attachment] : []),
+      ...attachments,
+    ].map((item) => ({
+      kind: item.kind,
+      extension: item.name.match(/\.[a-z0-9]{1,8}$/i)?.[0] ?? null,
+    })),
   }));
 
   try {

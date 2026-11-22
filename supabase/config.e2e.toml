@@ -177,3 +177,10 @@ verify_jwt = false
 # The assistant validates the signed-in user's access inside the function.
 [functions.crm-assistant]
 verify_jwt = false
+
+# Meta calls the webhook without a Supabase JWT. Its HMAC is checked by the handler.
+[functions.meta-webhook]
+verify_jwt = false
+# Manual sends and private attachment downloads validate the user's Supabase JWT.
+[functions.meta-inbox]
+verify_jwt = false

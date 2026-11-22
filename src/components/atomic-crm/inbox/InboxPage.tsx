@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { WhatsAppAttachment, WhatsAppComposer } from "./WhatsAppConversation";
+import { ChannelComposer, WhatsAppAttachment } from "./WhatsAppConversation";
+import { MetaAttachment } from "./MetaAttachment";
 import {
   AssistantObservation,
   AssistantSimulator,
@@ -16,7 +17,7 @@ import { config } from "../root/config";
 
 const deliveryLabels: Record<string, string> = {
   pending: "Pendiente de confirmación",
-  accepted: "Recibido por WhatsApp",
+  accepted: "Aceptado por Meta",
   sent: "Enviado",
   delivered: "Entregado",
   read: "Leído",
@@ -54,6 +55,7 @@ type Conversation = {
   last_message_at: string;
   last_inbound_at: string | null;
   whatsapp_phone_id: string | null;
+  meta_account_id: string | null;
   customer: {
     contact_id: number;
     classification: keyof typeof classifications;
@@ -114,7 +116,7 @@ function Inbox({ sellerId }: { sellerId: string | number }) {
       let request = client
         .from("inbox_conversations")
         .select(
-          "id, channel, assigned_sales_id, last_message_at, last_inbound_at, whatsapp_phone_id, customer:inbox_customers!inner(contact_id, classification, contact:contacts!inner(archived_at, first_name, last_name, email_jsonb, phone_jsonb))",
+          "id, channel, assigned_sales_id, last_message_at, last_inbound_at, whatsapp_phone_id, meta_account_id, customer:inbox_customers!inner(contact_id, classification, contact:contacts!inner(archived_at, first_name, last_name, email_jsonb, phone_jsonb))",
         );
       request = archived
         ? request.not("customer.contact.archived_at", "is", null)
@@ -140,7 +142,7 @@ function Inbox({ sellerId }: { sellerId: string | number }) {
       <div>
         <h2 className="text-2xl font-semibold">Bandeja omnicanal</h2>
         <p className="text-sm text-muted-foreground">
-          WhatsApp Business y conversaciones de demostración.
+          WhatsApp, Instagram Direct y Facebook Messenger.
         </p>
       </div>
       <div className="grid items-start gap-4 md:grid-cols-[minmax(15rem,1fr)_minmax(0,2fr)]">
@@ -317,6 +319,9 @@ function ConversationDetail({
   const staff = staffQuery.data ?? [];
   const actor = staff.find((seller) => String(seller.id) === String(sellerId));
   const canAssign = actor?.administrator && !actor.disabled;
+  const liveChannel = Boolean(
+    conversation.whatsapp_phone_id || conversation.meta_account_id,
+  );
   const canReply =
     actor &&
     !actor.disabled &&
@@ -336,7 +341,7 @@ function ConversationDetail({
     queryFn: async () => {
       const { data, error } = await client
         .from("inbox_messages")
-        .select("id, direction, body, sent_at, attachment_name, send_status")
+        .select("id, direction, body, sent_at, attachment_name, send_status, meta_message_attachments(id, position, name, mime, kind, state)")
         .eq("conversation_id", conversation.id)
         .order("sent_at", { ascending: false })
         .order("id", { ascending: false })
@@ -401,7 +406,7 @@ function ConversationDetail({
           <CardTitle>{contactName(conversation)}</CardTitle>
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary">{channels[conversation.channel]}</Badge>
-            {!conversation.whatsapp_phone_id && (
+            {!liveChannel && (
               <Badge variant="outline">Demostración</Badge>
             )}
             {customer.contact.archived_at && (
@@ -511,7 +516,7 @@ function ConversationDetail({
           </Button>
         </CardContent>
       </Card>
-      {conversation.whatsapp_phone_id && (
+      {liveChannel && (
         <AssistantObservation
           conversationId={conversation.id}
           canControl={Boolean(canReply)}
@@ -550,6 +555,10 @@ function ConversationDetail({
                     name={message.attachment_name}
                   />
                 )}
+                {message.meta_message_attachments
+                  .slice()
+                  .sort((a, b) => a.position - b.position)
+                  .map((attachment) => <MetaAttachment key={attachment.id} attachment={attachment} />)}
                 {message.send_status && (
                   <p className="text-xs text-muted-foreground">
                     {deliveryLabels[message.send_status]}
@@ -563,10 +572,10 @@ function ConversationDetail({
             hasNext={history.data?.hasNext}
             onChange={setPage}
           />
-          {conversation.whatsapp_phone_id &&
+          {liveChannel &&
             canReply &&
             (windowOpen ? (
-              <WhatsAppComposer conversationId={conversation.id} />
+              <ChannelComposer conversationId={conversation.id} channel={conversation.channel} />
             ) : (
               <p className="text-sm text-muted-foreground">
                 La ventana de 24 horas está cerrada. El cliente debe enviar un

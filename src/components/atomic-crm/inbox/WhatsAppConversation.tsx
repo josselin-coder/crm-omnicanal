@@ -12,6 +12,7 @@ const sendErrors: Record<string, string> = {
     "La ventana de 24 horas terminó. Espera un nuevo mensaje del cliente.",
   whatsapp_not_configured:
     "WhatsApp todavía no está configurado en el servidor.",
+  meta_not_configured: "Este canal de Meta todavía no está habilitado.",
   unauthenticated: "Tu sesión venció. Vuelve a iniciar sesión.",
   invalid_message: "Revisa el contenido del mensaje.",
   conflict:
@@ -23,11 +24,15 @@ const sendErrors: Record<string, string> = {
 type SendResult = { status: string };
 type SendAttempt = { requestId: string; text: string };
 
-export function WhatsAppComposer({
+export function ChannelComposer({
   conversationId,
+  channel,
 }: {
   conversationId: string;
+  channel: "whatsapp" | "instagram" | "messenger";
 }) {
+  const label = channel === "whatsapp" ? "WhatsApp" : channel === "instagram" ? "Instagram Direct" : "Messenger";
+  const endpoint = channel === "whatsapp" ? "whatsapp-inbox" : "meta-inbox";
   const [draft, setDraft] = useState("");
   const [attempt, setAttempt] = useState<SendAttempt>();
   const [sending, setSending] = useState(false);
@@ -47,9 +52,9 @@ export function WhatsAppComposer({
     try {
       const { data, error } =
         await getSupabaseClient().functions.invoke<SendResult>(
-          "whatsapp-inbox",
+          endpoint,
           {
-            body: { action: "send", conversationId, ...pending },
+            body: { action: "send", channel, conversationId, ...pending },
           },
         );
       if (error || !data) {
@@ -75,7 +80,7 @@ export function WhatsAppComposer({
           { type: "warning" },
         );
       } else if (data.status === "failed") {
-        notify("WhatsApp rechazó el envío.", { type: "error" });
+        notify(`${label} rechazó el envío.`, { type: "error" });
       }
     } catch {
       notify(
@@ -94,13 +99,13 @@ export function WhatsAppComposer({
       onSubmit={(event) => void send(event)}
     >
       <label className="block text-sm" htmlFor="whatsapp-reply">
-        Responder por WhatsApp
+        Responder por {label}
       </label>
       <textarea
         id="whatsapp-reply"
         className="w-full rounded-md border bg-background p-2 text-sm"
         rows={3}
-        maxLength={4096}
+        maxLength={channel === "whatsapp" ? 4096 : 1000}
         value={draft}
         disabled={sending || Boolean(attempt)}
         onChange={(event) => setDraft(event.target.value)}

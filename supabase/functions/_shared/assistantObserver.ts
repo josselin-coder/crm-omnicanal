@@ -20,8 +20,18 @@ export function parseTranscript(input: unknown): Turn[] | null {
     if (characters > historyLimit.characters) return null;
     const attachment = object(turn.attachment);
     const name = string(attachment.name).trim().slice(0, 160);
+    const attachments = Array.isArray(turn.attachments)
+      ? turn.attachments.slice(0, 8).map((raw) => {
+          const item = object(raw);
+          return {
+            name: string(item.name).trim().slice(0, 160),
+            kind: string(item.kind).slice(0, 32),
+          };
+        }).filter((item) => item.name)
+      : [];
     transcript.push({
       role: turn.role,
+      attachments,
       text: turn.text,
       attachment: name
         ? { name, kind: string(attachment.kind).slice(0, 32) }
