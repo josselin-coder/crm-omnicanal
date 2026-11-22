@@ -44,7 +44,14 @@ export function InboxNotifications() {
           if (recent.size >= 100)
             recent.delete(recent.values().next().value as string);
           recent.add(message.id);
-          notify("Nuevo mensaje de WhatsApp", { type: "info" });
+          const channel = String(message.provider_message_id).split(":")[0];
+          const label =
+            channel === "instagram"
+              ? "Instagram Direct"
+              : channel === "messenger"
+                ? "Messenger"
+                : "WhatsApp";
+          notify(`Nuevo mensaje de ${label}`, { type: "info" });
         },
       )
       .on(

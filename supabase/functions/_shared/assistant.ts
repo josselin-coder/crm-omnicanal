@@ -18,6 +18,7 @@ export type Turn = {
   role: "customer" | "seller" | "assistant";
   text: string;
   attachment?: { name: string; kind: string } | null;
+  attachments?: { name: string; kind: string }[];
 };
 
 const proposals = {
@@ -298,9 +299,10 @@ export function decide(
   }
   noDesign ||= model?.noDesign ?? false;
 
-  const attachments = customer.flatMap(({ attachment }) =>
-    attachment?.name ? [attachment] : [],
-  );
+  const attachments = customer.flatMap(({ attachment, attachments = [] }) => [
+    ...(attachment?.name ? [attachment] : []),
+    ...attachments,
+  ]);
   const files = [...new Set(attachments.map(({ name }) => name))];
   const facts = { name, service, quantity, files };
   const engine = options.engine ?? "rules";
